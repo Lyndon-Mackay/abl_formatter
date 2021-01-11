@@ -1,4 +1,4 @@
-string = ${ "\"" ~ inner ~ "\"" }
+string = ${ "\"" ~ inner ~ "\"" ~ ":U"? }
 inner = @{ char* }
 char = {
     !("\"" | "\\") ~ ANY
@@ -19,20 +19,19 @@ big_int = {"-"? ~ ASCII_DIGIT{1,19}}
 int = {"-"? ~ ASCII_DIGIT{1,10}}
 logical = {^"TRUE"|^"FALSE"|^"YES"|^"NO"}
 
-operators = {"+" | "-" | "*" | "/" | "=" | ^"EQ"| ^"NE" | ^"GT" | ^"GE" | ^"LT" | ^"LE" | ^"NOT" }
+datatype = {int | big_int | logical | string | date }
+
+not_operator = {(!operators ~ ANY)+ } // used for capturing varaibles
 
 /* This is more general then the actual language but not verifying syntax 
 exmaple 5 NOT 2 makes no sense in the abl progress language but for formatting purposes is ok */
-expression = { 
-    (int ~ operators ~ int) |
-    (big_int ~ operators ~ big_int) |
-    (logical ~ operators ~ logical) |
-    (string ~ operators ~ string) |
-    (date ~ operators ~ string) |
-    "(" ~ expression ~ ")"
+expression = {
+    datatype ~ operators ~ expression   |
+    not_operator ~ operators ~ expression   |
+    "(" ~ expression ~ ")"|
+     datatype |
+     not_operator
  }
-
-statement = { (keywords | ANY | expression)* ~ ":" | "." }
 
 keywords = {
 ^"X" | ^"Y" | ^"{}" | ^"**" | ^"LT" | ^"GO" | ^"FF" | ^"U1" | ^"U2" | ^"U3" | ^"U4" | ^"U5" | ^"U6" | ^"U7" | ^"U8" | ^"U9" | ^"IF" | ^"IN" | ^"IS" | ^"BS" | ^"BY" | ^"UP" | ^"GT" | ^"DO" | ^"OK" | ^"AS" | ^"AT" | ^"LF" | ^"NE" | ^"GE" | ^"NO" | ^"OF" | ^"ON" | ^"OR" | ^"TO" | ^"LC" | ^"LE" | ^"EQ" | ^"CR" | ^"YES" | ^"{*"  | ^"TAB" | ^"PRN" | ^"&IF" | ^"CUT" | ^"VMS" | ^"NOT" | ^"KEY" | ^"MAP" | ^"MPE" | ^"U10" |
