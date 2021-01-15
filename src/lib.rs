@@ -16,6 +16,24 @@ pub enum IoType {
     FromFile(String),
 }
 
+#[derive(PartialEq)]
+enum PrintType {
+    None,
+    NoSpace, //no space from previous word
+    End,
+    NewLine,
+}
+struct PrintInfo {
+    line: String,
+    criteria: PrintType,
+}
+
+impl PrintInfo {
+    fn new(line: String, criteria: PrintType) -> Self {
+        Self { line, criteria }
+    }
+}
+
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
 pub struct InputParser;
@@ -49,13 +67,17 @@ pub fn format_code(input: IoType) {
         for iner in parse_pair.into_inner() {
             match &iner.as_rule() {
                 Rule::COMMENT => {
-                    println!("{}", iner.clone().as_span().as_str());
+                    println!(
+                        "{}{}",
+                        get_tabs(indent_level),
+                        iner.clone().as_span().as_str()
+                    );
                 }
                 Rule::statement => indent_level = format_statement(iner.clone(), indent_level),
                 Rule::new_line => {
                     println!("")
                 }
-                Rule::keyword => print!("{} ", iner.as_span().as_str()),
+                Rule::keyword => print!("&&{}&&", iner.as_span().as_str()),
                 _ => println!("nothing"),
             };
         }
@@ -63,76 +85,158 @@ pub fn format_code(input: IoType) {
 }
 
 fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
-    let next_indent = indent_level;
+    let mut print_list = Vec::new();
+    let mut next_indent = indent_level;
     for iner in statement.into_inner() {
         match iner.as_rule() {
             Rule::loop_label => {
-                print!("{}", iner.as_span().as_str());
+                print_list.push(PrintInfo::new(
+                    format!("{}", iner.as_span().as_str()),
+                    PrintType::NoSpace,
+                ));
             }
-            Rule::keyword => print!(" {}", iner.as_span().as_str().to_uppercase()),
+            Rule::keyword => {
+                print_list.push(PrintInfo::new(
+                    format!("{}", &iner.as_span().as_str().to_uppercase()),
+                    PrintType::None,
+                ));
+            }
             Rule::expression => {
-                format_expression(iner, indent_level);
+                print_list.append(&mut format_expression(iner));
             }
             Rule::block_begin => {
-                print!(" {}", iner.as_span().as_str());
-                return next_indent + 1;
+                print_list.push(PrintInfo::new(
+                    format!("{}", iner.as_span().as_str()),
+                    PrintType::NoSpace,
+                ));
+                next_indent += 1;
             }
             Rule::block_end => {
-                print!(" {}", iner.as_span().as_str());
+                print_list.push(PrintInfo::new(
+                    format!("{}", &iner.as_span().as_str()).to_uppercase(),
+                    PrintType::End,
+                ));
                 if next_indent > 0 {
-                    return next_indent - 1;
-                }
-                return 0;
+                    next_indent -= 1
+                } else {
+                    next_indent = 0
+                };
             }
             Rule::new_line => {
-                println!("");
-                print!("{}", get_tabs(indent_level))
+                print_list.push(PrintInfo::new(format!("\n"), PrintType::NewLine));
             }
-            Rule::statement_end => {
-                print!("{}", iner.as_span().as_str().to_uppercase())
-            }
-            Rule::datatype => format_datatype(iner),
+            Rule::statement_end => print_list.push(PrintInfo::new(
+                format!("{}", &iner.as_span().as_str().to_uppercase()),
+                PrintType::End,
+            )),
+            Rule::datatype => print_list.push(PrintInfo::new(
+                format!("{}", &format_datatype(iner)),
+                PrintType::None,
+            )),
 
             _ => print!("+++++{:?}+++++++", iner.as_rule()),
         }
     }
+
+    let mut words_iter = print_list.into_iter().enumerate().peekable();
+    while words_iter.peek().is_some() {
+        let (i, word) = words_iter.next().unwrap();
+        if i == 0 && word.criteria != PrintType::End {
+            print!("{}{}", get_tabs(indent_level), word.line.trim());
+            continue;
+        }
+        if word.criteria == PrintType::End {
+            if indent_level == 0 {
+                print!("{}", word.line.trim())
+            } else {
+                print!("{}{}", get_tabs(indent_level - 1), word.line.trim());
+            }
+            continue;
+        }
+        match word.criteria {
+            PrintType::None => {
+                print!(" {}", word.line.trim())
+            }
+            PrintType::NoSpace => {
+                print!("{}", word.line.trim())
+            }
+            PrintType::End => {
+                print!("{}", word.line.trim())
+            }
+            PrintType::NewLine => {
+                let followup = words_iter.peek();
+
+                match followup {
+                    Some((_, peeked_print_info))
+                        if peeked_print_info.criteria == PrintType::NewLine =>
+                    {
+                        println!("$$$$$")
+                    }
+                    Some((_, peeked_print_info))
+                        if peeked_print_info.criteria == PrintType::End =>
+                    {
+                        println!("");
+                        if indent_level > 0 {
+                            print!("{}", get_tabs(indent_level))
+                        }
+                    }
+                    _ => {
+                        println!("");
+                        print!("{}", get_tabs(indent_level + 1))
+                    }
+                }
+            }
+        }
+    }
+
     next_indent
 }
 
-fn format_expression(expression: Pair<Rule>, indent_level: usize) {
+fn format_expression(expression: Pair<Rule>) -> Vec<PrintInfo> {
+    let mut print_list = Vec::new();
     for iner in expression.into_inner() {
         match iner.as_rule() {
             Rule::operator | Rule::keyword => {
-                print!(" {}", iner.as_span().as_str().to_uppercase())
+                print_list.push(PrintInfo::new(
+                    format!("{}", &iner.as_span().as_str().to_uppercase()),
+                    PrintType::None,
+                ));
             }
-            Rule::COMMENT => {
-                print!("{}", iner.as_span().as_str())
-            }
+            Rule::COMMENT => print_list.push(PrintInfo::new(
+                format!("{}", iner.as_span().as_str()),
+                PrintType::None,
+            )),
             Rule::expression => {
-                format_expression(iner, indent_level);
+                print_list.append(&mut format_expression(iner));
             }
             Rule::new_line => {
-                println!("");
-                println!("{}", get_tabs(indent_level));
+                print_list.push(PrintInfo::new("\n".to_string(), PrintType::NewLine));
             }
             Rule::variable => {
-                print!(" {}", iner.as_span().as_str());
+                print_list.push(PrintInfo::new(
+                    format!("{}", iner.as_span().as_str()),
+                    PrintType::None,
+                ));
             }
-            Rule::datatype => format_datatype(iner),
-            _ => print!(" {}", iner.as_span().as_str()),
+            Rule::datatype => print_list.push(PrintInfo::new(
+                format!("{}", &format_datatype(iner)),
+                PrintType::None,
+            )),
+            _ => print!("{}", iner.as_span().as_str()),
         }
     }
+    print_list
 }
 
-fn format_datatype(data_type: Pair<Rule>) {
+fn format_datatype(data_type: Pair<Rule>) -> String {
+    let mut print_string = String::with_capacity(data_type.as_str().len());
     for iner in data_type.into_inner() {
         match iner.as_rule() {
-            Rule::logical => {
-                print!(" {}", iner.as_span().as_str().to_uppercase())
-            }
-            _ => print!("{} ", iner.as_span().as_str()),
+            Rule::logical => print_string.push_str(&iner.as_span().as_str().to_uppercase()),
+            _ => print_string.push_str(iner.as_span().as_str()),
         }
     }
+    print_string
 }
 
 fn get_tabs(indent_level: usize) -> String {
