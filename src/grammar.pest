@@ -31,7 +31,7 @@ block_begin = { ":"}
 
 loop_label = @{ variable~ ":"}
 
-block_end = {^"END."}
+block_end = { ^"END" ~ "PROCEDURE" ~ "." | ^"END" ~ "."}
 
 statement_end = { "." }
 
