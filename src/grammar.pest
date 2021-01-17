@@ -11,7 +11,7 @@ comment_content = { (!("*/"|"/*") ~ ANY) * }
 
 WHITESPACE = _{ " " | "\t" }
 
-date = {ASCII_DIGIT{2}~"/"~ASCII_DIGIT{2}~ASCII_DIGIT{2}}
+date = {ASCII_DIGIT{2}~"/"~ASCII_DIGIT{2}~"/"~ASCII_DIGIT{2}}
 
 decimal = {ASCII_DIGIT{1,40} ~ "." ~ASCII_DIGIT{1,10} }
 
@@ -21,11 +21,13 @@ logical = {^"TRUE"|^"FALSE"|^"YES"|^"NO"}
 
 datatype = {int | big_int | logical | string | date }
 
-operator = {"+" | "-" | "*" | "/" | "=" | "<" | "<=" | ">" | ">=" | ^"EQ"| ^"NE" | ^"GT" | ^"GE" | ^"LT" | ^"LE" | ^"NOT" | ^"AND" | ^"OR" }
+operator = {"+" | "-" | "*" | "/" | "=" | "<" | "<=" | ">" | ">=" | ^"EQ"| ^"NE" | ^"GT" | ^"GE" | ^"LT" | ^"LE" | ^"NOT" | ^"AND" | ^"OR" | "^MATCHES" }
 
 new_line = {NEWLINE} // for capturing newlines in the program especially empty lines so line count will not be reduced.
 
-variable = @{("-"| !operator ~ (ASCII_ALPHA | "_" ))+ } // used for capturing variables
+subvar = _{ ("_"| (!operator ~ ASCII_ALPHA))+ ~  ("-"| "_" | (!operator ~ ASCII_ALPHA))? }
+
+variable = ${ subvar ~ ("." ~ subvar)? } // used for capturing variables
 
 block_begin = { ":"}
 
@@ -35,23 +37,79 @@ block_end = { ^"END" ~ "PROCEDURE" ~ "." | ^"END" ~ "."}
 
 statement_end = { "." }
 
+left_parenthesis = {"("}
+
+right_parenthesis = {")"}
+
 /* This is more general then the actual language but not verifying syntax 
 exmaple 5 NOT 2 makes no sense in the abl progress language but for formatting purposes is ok */
 expression = {
     datatype ~ operator ~ expression   |
-    keyword ~ "(" ~ expression ~ ")" ~ (operator ~ expression)? |
-    variable ~ "(" ~ expression ~ ")" ~ (operator ~ expression)? |
+    (!^"WHEN" ~ keyword) ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
+    variable ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
     variable ~ operator ~ expression   |
-    "(" ~ expression ~ ")" |
-     datatype ~ new_line? |
-     variable ~ new_line? |
-     operator ~ new_line ~ expression |
-     new_line ~ expression
+    left_parenthesis ~ expression ~ right_parenthesis |
+    datatype ~ new_line? |
+    variable ~ new_line? |
+    operator ~ new_line ~ expression |
+    new_line ~ expression
 }
 
-include = @{ "{" ~ ( !"}" ~ANY)* ~ "}" }
+conditional_expression_pred = {
+    (^"IF" | ^"WHERE" | ^"WHILE")
+}
+//expressions starting with if or where will lielly be formatted differentky in future.
+conditional_expression = {
+    conditional_expression_pred   ~ expression
+}
 
-statement = { loop_label | block_end | (( include | keyword | expression |  datatype)* ~ ( block_begin |  statement_end )) }
+field_keyword = { ^"FIELD"}
+
+aslike_keyword = { ^"AS" | ^"LIKE" }
+
+like_keyword = {^"LIKE"}
+
+define_keyword = {^"DEFINE"}
+
+temptable_keyword = {^"TEMP-TABLE"}
+
+temp_table_field = {
+    field_keyword ~ variable ~ aslike_keyword ~ keyword ~ new_line?
+}
+
+temp_table_like = {
+    like_keyword ~ variable ~ new_line?
+}
+
+define_temp_table = {
+    (define_keyword ~ (!temptable_keyword ~ keyword)? ~ temptable_keyword ~ variable ~ (!(^"FIELD"|^"LIKE") ~ keyword)* ~ new_line?) ~
+    (temp_table_like)? ~
+    (temp_table_field)* ~ (keyword | new_line)*
+
+}
+
+assign_keyword = {^"ASSIGN"}
+
+input_keyword = {^"INPUT"}
+
+framebrowse_keyword = {^"FRAME" | ^"BROWSE"}
+
+when_keyword = {^"WHEN"}
+noerror_keyword = {^"NO-ERROR"}
+assign_statement = {
+    assign_keyword ~ (input_keyword? ~ framebrowse_keyword ~ variable )?
+    ~ (expression ~ (when_keyword ~ expression) )*
+    ~ noerror_keyword?
+}
+
+include = ${ "{" ~ inner_include ~ ("}"| (include ~ inner_include)* ~ "}" )  }
+inner_include = { (!("}"|"{") ~ ANY)*}
+
+statement = { 
+    loop_label | block_end | 
+    (( define_temp_table | assign_statement | conditional_expression | keyword | expression |  datatype)* 
+    ~ ( block_begin |  statement_end ))
+}
 
 program = { (new_line | include | statement | COMMENT  )* ~ EOI}
 
@@ -381,7 +439,7 @@ keywords_25 = _{
 ^"ABSO" | ^"ASCE" | ^"ATTR" | ^"AVER" | ^"BACK" | ^"BELL" | ^"BGC"  | ^"BGCO" | ^"BOTH" | ^"BREAK"| ^"BTOS" | ^"BYTE" | ^"CALL" | ^"CAPS" | ^"CASE" | ^"CHAR" | ^"CODE" | ^"COM1" | ^"COM2" | ^"COM3" 
 | ^"COM4" | ^"COM5" | ^"COM6" | ^"COM7" | ^"COM8" | ^"COM9" | ^"COPY" | ^"CTOS" | ^"CURS" | ^"DATE" | ^"_DCM" | ^"DEBU" | ^"DECI" | ^"DEFI" | ^"DESC" | ^"DICT" | ^"DISP" | ^"DOWN" | ^"DROP" | ^"DUMP" 
 | ^"EACH" | ^"ECHO" | ^"EDGE" | ^"ELSE" | ^"EXCL" | ^"EXIT" | ^"FGCO" | ^"FILE" | ^"FILL" | ^"FIND" | ^"FONT" | ^"FORE" | ^"FORM" | ^"FRAM" | ^"FROM" | ^"GOTO" | ^"HELP" | ^"HIDE" | ^"HINT" | ^"HOME" 
-| ^"HORI" | ^"HWND" | ^"ICON" | ^"INFO" | ^"INIT" | ^"INTE" | ^"INTO" | ^"ITEM" | ^"JOIN" | ^"KEYS" | ^"LAST" | ^"LEFT" | ^"LIKE" | ^"LINE" | ^"LOAD" | ^"LONG" | ^"LPT0" | ^"LPT1" | ^"LPT2" | ^"LPT3" 
+| ^"HORI" | ^"HWND" | ^"ICON" | ^"INFO" | ^"INIT" | ^"INTE" | ^"INTO" | /*^"ITEM" |  removed due to being used as a variable quite often*/ ^"JOIN" | ^"KEYS" | ^"LAST" | ^"LEFT" | ^"LIKE" | ^"LINE" | ^"LOAD" | ^"LONG" | ^"LPT0" | ^"LPT1" | ^"LPT2" | ^"LPT3" 
 | ^"LPT4" | ^"LPT5" | ^"LPT6" | ^"LPT7" | ^"LPT8" | ^"LPT9" | ^"MENU" | ^"MINI" | ^"MOVE" | ^"_MSG" | ^"NAME" | ^"&NEW" | ^"NEXT" | ^"NO-F" | ^"NONE" | ^"NULL" | ^"OPEN" | ^"PAGE" | ^"PERF" | ^"PFCO" 
 | ^"PGDN" | ^"PGUP" | ^"PICK" | ^"PREV" | ^"QUIT" | ^"READ" | ^"REAL" | ^"RECT" | ^"RULE" | ^"SAVE" | ^"SEEK" | ^"SELF" | ^"SEND" | ^"SIZE" | ^"SKIP" | ^"SOME" | ^"SORT" | ^"SQRT" | ^"STOP" | ^"TERM" 
 | ^"TEXT" | ^"THEN" | ^"THRU" | ^"TIME" | ^"TRIM" | ^"TRUE" | ^"TYPE" | ^"UNDO" | ^"UNIX" | ^"USER" | ^"VARI" | ^"VERB" | ^"VERT" | ^"VIEW" | ^"WAIT" | ^"WHEN" | ^"WITH" | ^"X-OF" | ^"XREF" | ^"YEAR" 
