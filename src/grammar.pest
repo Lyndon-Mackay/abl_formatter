@@ -1,7 +1,19 @@
-string = ${ "\"" ~ inner ~ "\"" ~ ":U"? }
+string = ${double_quote_string}
+
+double_quote_string = _{ "\"" ~ inner ~ "\"" ~ (":"~ ASCII_ALPHA)?  }
 inner = @{ char* }
 char = {
     !("\"" | "\\") ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+singe_quote_string = ${ "'" ~single_quote_inner ~ "'" }
+
+single_quote_inner = @{single_quote_char*}
+
+single_quote_char = {
+    !("'" | "\\") ~ ANY
     | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
     | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
@@ -41,17 +53,24 @@ left_parenthesis = {"("}
 
 right_parenthesis = {")"}
 
+//distinguished from regular brackets by a space
+function = ${
+    (keyword | variable) ~ left_parenthesis  ~ (function_content)* ~ right_parenthesis
+}
+
+function_content = { !")" ~ ( keyword | expression | "," | function_content | new_line )* }
+
 /* This is more general then the actual language but not verifying syntax 
 exmaple 5 NOT 2 makes no sense in the abl progress language but for formatting purposes is ok */
 expression = {
     datatype ~ operator ~ expression   |
+    function ~ (operator ~ expression)? |
     (!^"WHEN" ~ keyword) ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
     variable ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
     variable ~ operator ~ expression   |
     left_parenthesis ~ expression ~ right_parenthesis |
     datatype ~ new_line? |
     variable ~ new_line? |
-    operator ~ new_line ~ expression |
     new_line ~ expression
 }
 
@@ -73,9 +92,10 @@ define_keyword = {^"DEFINE"}
 
 temptable_keyword = {^"TEMP-TABLE"}
 
-temp_table_field = {
+temp_table_single_field = {
     field_keyword ~ variable ~ aslike_keyword ~ keyword ~ new_line?
 }
+temp_table_fields = { temp_table_single_field* }
 
 temp_table_like = {
     like_keyword ~ variable ~ new_line?
@@ -84,7 +104,7 @@ temp_table_like = {
 define_temp_table = {
     (define_keyword ~ (!temptable_keyword ~ keyword)? ~ temptable_keyword ~ variable ~ (!(^"FIELD"|^"LIKE") ~ keyword)* ~ new_line?) ~
     (temp_table_like)? ~
-    (temp_table_field)* ~ (keyword | new_line)*
+    temp_table_fields ~ (keyword | new_line)*
 
 }
 
