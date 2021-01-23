@@ -6,6 +6,7 @@ use std::{
 };
 
 use pest::{iterators::Pair, Parser};
+use temp_table::format_temp_table;
 
 #[macro_use]
 extern crate pest_derive;
@@ -15,7 +16,7 @@ pub enum IoType {
     FromStdIn,
     FromFile(String),
 }
-
+mod temp_table;
 #[derive(PartialEq)]
 enum PrintType {
     None,
@@ -23,14 +24,17 @@ enum PrintType {
     End,
     NewLine,
 }
-struct PrintInfo {
+pub struct PrintInfo {
     line: String,
-    criteria: PrintType,
+    spacing_attribute: PrintType,
 }
 
 impl PrintInfo {
-    fn new(line: String, criteria: PrintType) -> Self {
-        Self { line, criteria }
+    fn new(line: String, spacing_attribute: PrintType) -> Self {
+        Self {
+            line,
+            spacing_attribute,
+        }
     }
 }
 
@@ -54,7 +58,7 @@ pub fn format_code(input: IoType) {
     input.read_to_end(&mut buf).expect("error reading in input");
 
     let buf = String::from_utf8_lossy(&buf);
-    println!("{:?}", &buf);
+    //    println!("{:?}", &buf);
 
     let sucessful_parse = InputParser::parse(Rule::program, &buf).expect("unscessful parse");
 
@@ -62,23 +66,32 @@ pub fn format_code(input: IoType) {
     println!("finish");*/
 
     let mut indent_level = 0;
-    println!("test{}", get_tabs(indent_level));
     for parse_pair in sucessful_parse {
         for iner in parse_pair.into_inner() {
             match &iner.as_rule() {
                 Rule::COMMENT => {
-                    println!(
+                    print!(
                         "{}{}",
                         get_tabs(indent_level),
                         iner.clone().as_span().as_str()
                     );
                 }
                 Rule::statement => indent_level = format_statement(iner.clone(), indent_level),
-                Rule::new_line => {
-                    println!("")
+                Rule::WHITESPACE => {
+                    if iner.as_str().contains("\n") {
+                        println!();
+                    } else if let Some(potential_newline) = iner.into_inner().next() {
+                        if let Rule::NEWLINE = potential_newline.as_rule() {
+                            println!()
+                        }
+                    }
                 }
-                Rule::keyword => print!("&&{}&&", iner.as_span().as_str()),
-                _ => println!("nothing"),
+                Rule::keyword => print!("{}", iner.as_span().as_str().to_uppercase()),
+                Rule::include => {
+                    println!("{}{}", get_tabs(indent_level), iner.as_span().as_str())
+                }
+                Rule::EOI => {}
+                _ => panic!("unrecongised program"),
             };
         }
     }
@@ -88,6 +101,7 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
     let mut print_list = Vec::new();
     let mut next_indent = indent_level;
     for iner in statement.into_inner() {
+        // println!("&&&&&&&&&&&&&&&7{:?}&&&&&&&&&&&&&&&&&&", iner);
         match iner.as_rule() {
             Rule::loop_label => {
                 print_list.push(PrintInfo::new(
@@ -101,8 +115,16 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
                     PrintType::None,
                 ));
             }
+            Rule::conditional_expression => {
+                /* println!("think of" this");
+                print!("{:?}", iner);
+                println!(); */
+                
+                print_list.append(&mut format_conditional_expression(iner))
+                //print_list.append(&mut format_expression(iner, true));
+            }
             Rule::expression => {
-                print_list.append(&mut format_expression(iner));
+                print_list.append(&mut format_expression(iner, false));
             }
             Rule::block_begin => {
                 print_list.push(PrintInfo::new(
@@ -122,8 +144,19 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
                     next_indent = 0
                 };
             }
-            Rule::new_line => {
-                print_list.push(PrintInfo::new(format!("\n"), PrintType::NewLine));
+            Rule::define_temp_table => {
+                print_list.append(&mut format_temp_table(iner));
+            }
+            Rule::assign_statement => {
+                println!("assign not implemented")
+            }
+            Rule::WHITESPACE => {
+                if let Some(f) = format_whitespace(iner) {
+                    print_list.push(f);
+                }
+            }
+            Rule::NEWLINE => {
+                println!();
             }
             Rule::statement_end => print_list.push(PrintInfo::new(
                 format!("{}", &iner.as_span().as_str().to_uppercase()),
@@ -134,26 +167,39 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
                 PrintType::None,
             )),
 
-            _ => print!("+++++{:?}+++++++", iner.as_rule()),
+            _ => eprint!("+++++{:?}+++++++", iner.as_rule()),
         }
     }
 
     let mut words_iter = print_list.into_iter().enumerate().peekable();
-    while words_iter.peek().is_some() {
-        let (i, word) = words_iter.next().unwrap();
-        if i == 0 && word.criteria != PrintType::End {
+    loop {
+        let (i, word) = match words_iter.next() {
+            Some((j, a_word)) => (j, a_word),
+            None => {
+                break;
+            }
+        };
+        if i == 0 && word.spacing_attribute != PrintType::End {
             print!("{}{}", get_tabs(indent_level), word.line.trim());
             continue;
         }
-        if word.criteria == PrintType::End {
-            if indent_level == 0 {
-                print!("{}", word.line.trim())
+        if word.spacing_attribute == PrintType::End {
+            if words_iter.peek().is_none() {
+                if indent_level == 0 {
+                    print!("{} ", word.line.trim())
+                } else {
+                    print!("{}{} ", get_tabs(indent_level - 1), word.line.trim());
+                }
             } else {
-                print!("{}{}", get_tabs(indent_level - 1), word.line.trim());
+                if indent_level == 0 {
+                    print!("{}", word.line.trim())
+                } else {
+                    print!("{}{}", get_tabs(indent_level - 1), word.line.trim());
+                }
             }
             continue;
         }
-        match word.criteria {
+        match word.spacing_attribute {
             PrintType::None => {
                 print!(" {}", word.line.trim())
             }
@@ -161,19 +207,23 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
                 print!("{}", word.line.trim())
             }
             PrintType::End => {
-                print!("{}", word.line.trim())
+                if words_iter.peek().is_none() {
+                    print!("{} ", word.line.trim());
+                } else {
+                    print!("{}", word.line.trim())
+                }
             }
             PrintType::NewLine => {
                 let followup = words_iter.peek();
 
                 match followup {
                     Some((_, peeked_print_info))
-                        if peeked_print_info.criteria == PrintType::NewLine =>
+                        if peeked_print_info.spacing_attribute == PrintType::NewLine =>
                     {
-                        println!("$$$$$")
+                        println!("")
                     }
                     Some((_, peeked_print_info))
-                        if peeked_print_info.criteria == PrintType::End =>
+                        if peeked_print_info.spacing_attribute == PrintType::End =>
                     {
                         println!("");
                         if indent_level > 0 {
@@ -192,25 +242,53 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
     next_indent
 }
 
-fn format_expression(expression: Pair<Rule>) -> Vec<PrintInfo> {
+fn format_conditional_expression(conditional_expression: Pair<Rule>) -> Vec<PrintInfo> {
     let mut print_list = Vec::new();
-    for iner in expression.into_inner() {
+    for iner in conditional_expression.into_inner() {
         match iner.as_rule() {
-            Rule::operator | Rule::keyword => {
+            Rule::conditional_expression_pred => {
                 print_list.push(PrintInfo::new(
                     format!("{}", &iner.as_span().as_str().to_uppercase()),
                     PrintType::None,
                 ));
             }
+            Rule::expression => print_list.append(&mut format_expression(iner, true)),
+            Rule::WHITESPACE => {
+                if let Some(f) = format_whitespace(iner) {
+                    print_list.push(f);
+                }
+            }
+            _ => panic!("invalid conditional expression somehow parsed"),
+        }
+    }
+    print_list
+}
+
+fn format_expression(expression: Pair<Rule>, conditional: bool) -> Vec<PrintInfo> {
+    let mut print_list = Vec::new();
+    for iner in expression.into_inner() {
+        match iner.as_rule() {
+            Rule::keyword => {
+                print_list.push(PrintInfo::new(
+                    format!("{}", &iner.as_span().as_str().to_uppercase()),
+                    PrintType::None,
+                ));
+            }
+            Rule::operator => print_list.push(PrintInfo::new(
+                format_operator(iner, conditional),
+                PrintType::None,
+            )),
             Rule::COMMENT => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str()),
                 PrintType::None,
             )),
             Rule::expression => {
-                print_list.append(&mut format_expression(iner));
+                print_list.append(&mut format_expression(iner, conditional));
             }
-            Rule::new_line => {
-                print_list.push(PrintInfo::new("\n".to_string(), PrintType::NewLine));
+            Rule::WHITESPACE => {
+                if let Some(f) = format_whitespace(iner) {
+                    print_list.push(f);
+                }
             }
             Rule::variable => {
                 print_list.push(PrintInfo::new(
@@ -239,10 +317,54 @@ fn format_datatype(data_type: Pair<Rule>) -> String {
     print_string
 }
 
+fn format_operator(operator: Pair<Rule>, conditional: bool) -> String {
+    match operator.as_span().as_str().trim() {
+        "<" => format!("LT"),
+        "<=" => format!("LE"),
+        ">" => format!("GT"),
+        ">=" => format!("GE"),
+        "=" if conditional => format!("EQ"),
+        misc => format!("{}", misc.to_uppercase()),
+    }
+}
+
 fn get_tabs(indent_level: usize) -> String {
     let mut tabs = String::with_capacity(indent_level);
     for _ in 0..indent_level {
         tabs.push_str("\t");
     }
     tabs
+}
+
+fn format_whitespace(white_space: Pair<Rule>) -> Option<PrintInfo> {
+    match white_space.clone().into_inner().next() {
+        Some(iner) => match iner.as_rule() {
+            Rule::NEWLINE => {
+                return Some(PrintInfo::new(
+                    format!("{}", iner.as_span().as_str()),
+                    PrintType::NewLine,
+                ))
+            }
+            _ => {
+                return if white_space.as_str().contains("\n") {
+                    Some(PrintInfo::new(
+                        format!("{}", white_space.as_str()),
+                        PrintType::NewLine,
+                    ))
+                } else {
+                    None
+                }
+            }
+        },
+        None => {
+            if white_space.as_str().contains("\n") {
+                Some(PrintInfo::new(
+                    format!("{}", white_space.as_str()),
+                    PrintType::NewLine,
+                ))
+            } else {
+                None
+            }
+        }
+    }
 }
