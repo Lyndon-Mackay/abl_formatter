@@ -1,6 +1,6 @@
 string = ${double_quote_string}
 
-double_quote_string = _{ "\"" ~ inner ~ "\"" ~ (":"~ ASCII_ALPHA)?  }
+double_quote_string = _{ "\"" ~ inner ~ "\"" ~ (":"~ ASCII_ALPHA)?}
 inner = @{ char* }
 char = {
     !("\"" | "\\") ~ ANY
@@ -8,7 +8,7 @@ char = {
     | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
 
-singe_quote_string = ${ "'" ~single_quote_inner ~ "'" }
+singe_quote_string = ${ "'" ~single_quote_inner ~ "'"}
 
 single_quote_inner = @{single_quote_char*}
 
@@ -21,7 +21,10 @@ single_quote_char = {
 COMMENT =@{"/*" ~ comment_content ~ ("*/"| (COMMENT ~ comment_content)* ~ "*/") }
 comment_content = { (!("*/"|"/*") ~ ANY) * }
 
-WHITESPACE = _{ " " | "\t" }
+WHITESPACE = {tab_space |NEWLINE }
+NEWLINE = {"\r\n" | "\n"}
+
+tab_space = _{ " "| "\t" }
 
 date = {ASCII_DIGIT{2}~"/"~ASCII_DIGIT{2}~"/"~ASCII_DIGIT{2}}
 
@@ -35,11 +38,10 @@ datatype = {int | big_int | logical | string | date }
 
 operator = {"+" | "-" | "*" | "/" | "=" | "<" | "<=" | ">" | ">=" | ^"EQ"| ^"NE" | ^"GT" | ^"GE" | ^"LT" | ^"LE" | ^"NOT" | ^"AND" | ^"OR" | "^MATCHES" }
 
-new_line = {NEWLINE} // for capturing newlines in the program especially empty lines so line count will not be reduced.
 
-subvar = _{ ("_"| (!operator ~ ASCII_ALPHA))+ ~  ("-"| "_" | (!operator ~ ASCII_ALPHA))? }
+subvar = _{ ("_"| (ASCII_ALPHA))+ ~  ("-"| "_" | (ASCII_ALPHA))? }
 
-variable = ${ subvar ~ ("." ~ subvar)? } // used for capturing variables
+variable = ${ !(operator ~ WHITESPACE | keyword ~ WHITESPACE) ~ subvar ~ ("." ~ subvar)?  } // used for capturing variables
 
 block_begin = { ":"}
 
@@ -58,7 +60,7 @@ function = ${
     (keyword | variable) ~ left_parenthesis  ~ (function_content)* ~ right_parenthesis
 }
 
-function_content = { !")" ~ ( keyword | expression | "," | function_content | new_line )* }
+function_content = { !")" ~ ( WHITESPACE| keyword | expression | "," | function_content )* }
 
 /* This is more general then the actual language but not verifying syntax 
 exmaple 5 NOT 2 makes no sense in the abl progress language but for formatting purposes is ok */
@@ -69,9 +71,8 @@ expression = {
     variable ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
     variable ~ operator ~ expression   |
     left_parenthesis ~ expression ~ right_parenthesis |
-    datatype ~ new_line? |
-    variable ~ new_line? |
-    new_line ~ expression
+    datatype |
+    variable
 }
 
 conditional_expression_pred = {
@@ -93,18 +94,18 @@ define_keyword = {^"DEFINE"}
 temptable_keyword = {^"TEMP-TABLE"}
 
 temp_table_single_field = {
-    field_keyword ~ variable ~ aslike_keyword ~ keyword ~ new_line?
+    field_keyword ~ variable ~ aslike_keyword ~ keyword ~ (!(^"FIELD"|statement_end) ~ (keyword | ANY) )* 
 }
 temp_table_fields = { temp_table_single_field* }
 
 temp_table_like = {
-    like_keyword ~ variable ~ new_line?
+    like_keyword ~ variable 
 }
 
 define_temp_table = {
-    (define_keyword ~ (!temptable_keyword ~ keyword)? ~ temptable_keyword ~ variable ~ (!(^"FIELD"|^"LIKE") ~ keyword)* ~ new_line?) ~
+    (define_keyword ~ (!temptable_keyword ~ keyword)? ~ temptable_keyword ~ variable ~ (!(^"FIELD"|^"LIKE") ~ keyword)* ) ~
     (temp_table_like)? ~
-    temp_table_fields ~ (keyword | new_line)*
+    temp_table_fields ~ (!field_keyword ~ keyword )*
 
 }
 
@@ -131,12 +132,12 @@ statement = {
     ~ ( block_begin |  statement_end ))
 }
 
-program = { (new_line | include | statement | COMMENT  )* ~ EOI}
+program = { (NEWLINE | include | statement | COMMENT  )* ~ EOI}
 
-keyword = {
-    keywords_1 |  keywords_2 | keywords_3 | keywords_4 | keywords_5 | keywords_6 | keywords_7 | keywords_8 | keywords_9 | keywords_10 | keywords_11 | keywords_12 | keywords_13 | keywords_14 
+keyword = ${
+    (keywords_1 |  keywords_2 | keywords_3 | keywords_4 | keywords_5 | keywords_6 | keywords_7 | keywords_8 | keywords_9 | keywords_10 | keywords_11 | keywords_12 | keywords_13 | keywords_14 
     | keywords_15 | keywords_16 | keywords_17 | keywords_18 | keywords_19 | keywords_20 | keywords_21 | keywords_22 | keywords_23 | keywords_24 | keywords_25 | keywords_26 | keywords_27 
-    | keywords_28
+    | keywords_28)
 }
 
 keywords_1 = _{
