@@ -1,10 +1,13 @@
 extern crate pest;
+mod assign;
+mod temp_table;
 
 use std::{
     fs::File,
     io::{stdin, BufRead, BufReader},
 };
 
+use assign::format_assign;
 use pest::{iterators::Pair, Parser};
 use temp_table::format_temp_table;
 
@@ -16,7 +19,6 @@ pub enum IoType {
     FromStdIn,
     FromFile(String),
 }
-mod temp_table;
 #[derive(PartialEq)]
 enum PrintType {
     None,
@@ -101,7 +103,6 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
     let mut print_list = Vec::new();
     let mut next_indent = indent_level;
     for iner in statement.into_inner() {
-        // println!("&&&&&&&&&&&&&&&7{:?}&&&&&&&&&&&&&&&&&&", iner);
         match iner.as_rule() {
             Rule::loop_label => {
                 print_list.push(PrintInfo::new(
@@ -116,12 +117,7 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
                 ));
             }
             Rule::conditional_expression => {
-                /* println!("think of" this");
-                print!("{:?}", iner);
-                println!(); */
-                
                 print_list.append(&mut format_conditional_expression(iner))
-                //print_list.append(&mut format_expression(iner, true));
             }
             Rule::expression => {
                 print_list.append(&mut format_expression(iner, false));
@@ -148,7 +144,7 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
                 print_list.append(&mut format_temp_table(iner));
             }
             Rule::assign_statement => {
-                println!("assign not implemented")
+                print_list.append(&mut format_assign(iner));
             }
             Rule::WHITESPACE => {
                 if let Some(f) = format_whitespace(iner) {
@@ -258,7 +254,10 @@ fn format_conditional_expression(conditional_expression: Pair<Rule>) -> Vec<Prin
                     print_list.push(f);
                 }
             }
-            _ => panic!("invalid conditional expression somehow parsed"),
+            une => panic!(
+                "{:?},\n{:?} invalid conditional expression somehow parsed",
+                une, iner
+            ),
         }
     }
     print_list

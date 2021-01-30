@@ -65,14 +65,12 @@ function_content = { !")" ~ ( WHITESPACE| keyword | expression | "," | function_
 /* This is more general then the actual language but not verifying syntax 
 exmaple 5 NOT 2 makes no sense in the abl progress language but for formatting purposes is ok */
 expression = {
-    datatype ~ operator ~ expression   |
+    datatype ~ (operator ~ expression )?  |
     function ~ (operator ~ expression)? |
     (!^"WHEN" ~ keyword) ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
     variable ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
-    variable ~ operator ~ expression   |
-    left_parenthesis ~ expression ~ right_parenthesis |
-    datatype |
-    variable
+    variable ~( operator ~ expression)?   |
+    left_parenthesis ~ expression ~ right_parenthesis 
 }
 
 conditional_expression_pred = {
@@ -117,9 +115,16 @@ framebrowse_keyword = {^"FRAME" | ^"BROWSE"}
 
 when_keyword = {^"WHEN"}
 noerror_keyword = {^"NO-ERROR"}
+
+equals = { "="}
+
+assign_line = { variable ~ equals ~ expression ~ (when_keyword ~ expression)? }
+
+assign_lines = {assign_line+}
+
 assign_statement = {
     assign_keyword ~ (input_keyword? ~ framebrowse_keyword ~ variable )?
-    ~ (expression ~ (when_keyword ~ expression) )*
+    ~ assign_lines
     ~ noerror_keyword?
 }
 
@@ -137,7 +142,7 @@ program = { (NEWLINE | include | statement | COMMENT  )* ~ EOI}
 keyword = ${
     (keywords_1 |  keywords_2 | keywords_3 | keywords_4 | keywords_5 | keywords_6 | keywords_7 | keywords_8 | keywords_9 | keywords_10 | keywords_11 | keywords_12 | keywords_13 | keywords_14 
     | keywords_15 | keywords_16 | keywords_17 | keywords_18 | keywords_19 | keywords_20 | keywords_21 | keywords_22 | keywords_23 | keywords_24 | keywords_25 | keywords_26 | keywords_27 
-    | keywords_28)
+    | keywords_28) ~ !ASCII_ALPHA
 }
 
 keywords_1 = _{

@@ -99,6 +99,7 @@ fn format_temp_table_fields(fields: Pair<Rule>) -> Vec<PrintInfo> {
             line.push_str(&mut curr.variable.pad_to_width(largest_variable_length));
             // line.push_str(&format!(" "));
             line.push_str(&mut curr.after_variable);
+
             acc.push(PrintInfo::new(line, PrintType::None));
             acc.push(PrintInfo::new(format!("\n"), PrintType::NewLine));
             acc
