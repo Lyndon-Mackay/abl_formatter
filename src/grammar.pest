@@ -1,4 +1,4 @@
-string = ${double_quote_string}
+string = ${double_quote_string| single_quote_string}
 
 double_quote_string = _{ "\"" ~ inner ~ "\"" ~ (":"~ ASCII_ALPHA)?}
 inner = @{ char* }
@@ -8,7 +8,7 @@ char = {
     | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
 
-singe_quote_string = ${ "'" ~single_quote_inner ~ "'"}
+single_quote_string = ${ "'" ~single_quote_inner ~ "'"}
 
 single_quote_inner = @{single_quote_char*}
 
@@ -34,12 +34,12 @@ big_int = {"-"? ~ ASCII_DIGIT{1,19}}
 int = {"-"? ~ ASCII_DIGIT{1,10}}
 logical = {^"TRUE"|^"FALSE"|^"YES"|^"NO"}
 
-datatype = {int | big_int | logical | string | date }
+datatype = ${int | big_int | logical | string | date }
 
 operator = {"+" | "-" | "*" | "/" | "=" | "<" | "<=" | ">" | ">=" | ^"EQ"| ^"NE" | ^"GT" | ^"GE" | ^"LT" | ^"LE" | ^"NOT" | ^"AND" | ^"OR" | "^MATCHES" }
 
 
-subvar = _{ ("_"| (ASCII_ALPHA))+ ~  ("-"| "_" | (ASCII_ALPHA))? }
+subvar = _{ ("_"| (ASCII_ALPHANUMERIC))+ ~  ("-"| "_" | (ASCII_ALPHANUMERIC))* }
 
 variable = ${ !(operator ~ WHITESPACE | keyword ~ WHITESPACE) ~ subvar ~ ("." ~ subvar)?  } // used for capturing variables
 
@@ -55,12 +55,13 @@ left_parenthesis = {"("}
 
 right_parenthesis = {")"}
 
+comma = {","}
 //distinguished from regular brackets by a space
 function = ${
     (keyword | variable) ~ left_parenthesis  ~ (function_content)* ~ right_parenthesis
 }
 
-function_content = { !")" ~ ( WHITESPACE| keyword | expression | "," | function_content )* }
+function_content = { !")" ~ (  keyword | expression | comma )* }
 
 /* This is more general then the actual language but not verifying syntax 
 exmaple 5 NOT 2 makes no sense in the abl progress language but for formatting purposes is ok */
@@ -70,7 +71,8 @@ expression = {
     (!^"WHEN" ~ keyword) ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
     variable ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
     variable ~( operator ~ expression)?   |
-    left_parenthesis ~ expression ~ right_parenthesis 
+    left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)?
+
 }
 
 conditional_expression_pred = {
@@ -118,7 +120,7 @@ noerror_keyword = {^"NO-ERROR"}
 
 equals = { "="}
 
-assign_line = { variable ~ equals ~ expression ~ (when_keyword ~ expression)? }
+assign_line = { variable ~ equals ~ expression ~  (when_keyword ~ expression)? }
 
 assign_lines = {assign_line+}
 
@@ -142,7 +144,7 @@ program = { (NEWLINE | include | statement | COMMENT  )* ~ EOI}
 keyword = ${
     (keywords_1 |  keywords_2 | keywords_3 | keywords_4 | keywords_5 | keywords_6 | keywords_7 | keywords_8 | keywords_9 | keywords_10 | keywords_11 | keywords_12 | keywords_13 | keywords_14 
     | keywords_15 | keywords_16 | keywords_17 | keywords_18 | keywords_19 | keywords_20 | keywords_21 | keywords_22 | keywords_23 | keywords_24 | keywords_25 | keywords_26 | keywords_27 
-    | keywords_28) ~ !ASCII_ALPHA
+    | keywords_28) ~ &(WHITESPACE| statement_end| block_begin)
 }
 
 keywords_1 = _{

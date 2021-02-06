@@ -1,6 +1,4 @@
-use std::env::var;
-
-use crate::{format_expression, format_whitespace, PrintInfo, PrintType, Rule};
+use crate::{expression::format_expression, format_whitespace, PrintInfo, PrintType, Rule};
 use pad::PadStr;
 use pest::iterators::{Pair, Pairs};
 
@@ -136,12 +134,10 @@ fn format_assign_single_line(line: Pair<Rule>) -> AssignLinePrintInfo {
         Some(_) => {
             let (before_when_expr, when_expr) = get_to_expression(&mut iter);
             let post_expr = iter
-                .filter_map(|x| {
-                    if let Rule::COMMENT = x.as_rule() {
-                        Some(PrintInfo::new(x.as_str().to_string(), PrintType::None))
-                    } else {
-                        None
-                    }
+                .filter_map(|x| match x.as_rule() {
+                    Rule::COMMENT => Some(PrintInfo::new(x.as_str().to_string(), PrintType::None)),
+                    Rule::WHITESPACE => format_whitespace(x),
+                    _ => None,
                 })
                 .collect::<Vec<_>>();
             (before_when_expr, when_expr, post_expr)
@@ -187,7 +183,9 @@ fn get_to_assign_expression(iter: &mut Pairs<Rule>) -> (Vec<PrintInfo>, Vec<Prin
             Rule::COMMENT => {
                 before_expr.push(PrintInfo::new(next.as_str().to_string(), PrintType::None))
             }
-            Rule::expression => break format_expression(next, true),
+            Rule::expression => {
+                break format_expression(next, true);
+            }
             Rule::equals => {
                 before_expr.push(PrintInfo::new(next.as_str().to_string(), PrintType::None))
             }
@@ -212,7 +210,11 @@ fn get_to_when_keyword(iter: &mut Pairs<Rule>) -> (Vec<PrintInfo>, Option<PrintI
             Rule::when_keyword => {
                 break Some(PrintInfo::new(next.as_str().to_string(), PrintType::None))
             }
-            Rule::WHITESPACE => {}
+            Rule::WHITESPACE => {
+                if let Some(line) = format_whitespace(next) {
+                    before_when.push(line);
+                }
+            }
             une => panic!(" unexpected assign {:?}", une),
         }
     };

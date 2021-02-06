@@ -78,7 +78,6 @@ fn format_temp_table_like(like_field: Pair<Rule>) -> Vec<PrintInfo> {
 }
 
 fn format_temp_table_fields(fields: Pair<Rule>) -> Vec<PrintInfo> {
-    // println!("********{}********", fields.as_str());
     let mut fields_and_length_list = Vec::new();
     let mut largest_variable_length = 0;
     for iner in fields.into_inner() {
