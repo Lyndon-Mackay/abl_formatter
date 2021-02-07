@@ -29,6 +29,7 @@ enum PrintType {
     NewLine,
     ExtraIndent,
     NoRightPad,
+    TabPadRight,
 }
 pub struct PrintInfo {
     line: String,
@@ -207,7 +208,9 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
                     _ => print!(" {}", word.line.trim()),
                 }
             }
-
+            PrintType::TabPadRight => {
+                print!("{}\t", word.line.trim());
+            }
             PrintType::NoSpace => {
                 print!("{}", word.line.trim())
             }

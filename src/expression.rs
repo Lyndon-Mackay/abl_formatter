@@ -1,5 +1,7 @@
+use std::iter::{FilterMap, Peekable};
+
 use crate::{format_whitespace, PrintInfo, PrintType, Rule};
-use pest::iterators::Pair;
+use pest::iterators::{Pair, Pairs};
 
 #[derive(PartialEq)]
 enum BracketFormatting {
@@ -49,7 +51,6 @@ pub fn format_expression(expression: Pair<Rule>, conditional: bool) -> Vec<Print
             _ => Some(x.as_rule()),
         })
         .take(3)
-        //.inspect(|x| println!("{:?}", x))
         .collect::<Vec<Rule>>()
         .as_slice()
     {
@@ -81,7 +82,12 @@ fn inner_format_expression(
 ) -> Vec<PrintInfo> {
     let mut print_list = Vec::new();
 
-    for iner in expression.into_inner() {
+    let mut iter = expression.into_inner();
+    loop {
+        let iner = match iter.next() {
+            Some(x) => x,
+            None => break print_list,
+        };
         match iner.as_rule() {
             Rule::keyword => {
                 print_list.push(PrintInfo::new(
@@ -89,10 +95,27 @@ fn inner_format_expression(
                     PrintType::None,
                 ));
             }
-            Rule::operator => print_list.push(PrintInfo::new(
-                format_operator(iner, conditional),
-                PrintType::None,
-            )),
+            Rule::operator => {
+                //check to add tab before left parenthesis if an outermost logical
+                let pr_type = if *unclosed_left_count == 1
+                    && *brackets != BracketFormatting::None
+                    && iter
+                        .clone()
+                        .filter_map(|x| match x.as_rule() {
+                            Rule::WHITESPACE | Rule::COMMENT => None,
+                            Rule::expression => Some(x.into_inner().next()?.as_rule()),
+                            x => Some(x),
+                        })
+                        .next()
+                        == Some(Rule::left_parenthesis)
+                {
+                    PrintType::TabPadRight
+                } else {
+                    PrintType::None
+                };
+
+                print_list.push(PrintInfo::new(format_operator(iner, conditional), pr_type))
+            }
             Rule::COMMENT => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str()),
                 PrintType::None,
@@ -135,6 +158,7 @@ fn inner_format_expression(
             }
             Rule::left_parenthesis => {
                 *unclosed_left_count += 1;
+
                 match brackets {
                     BracketFormatting::TwoOpening(f, _) if *f => {
                         print_list.push(PrintInfo::new(
@@ -151,6 +175,32 @@ fn inner_format_expression(
                         ));
                         *brackets = BracketFormatting::TwoOpening(false, false);
                     }
+                    BracketFormatting::None if *unclosed_left_count == 1 => {
+                        //if next value is left parenthesis change to special formatting
+                        if iter
+                            .clone()
+                            .filter_map(|x| match x.as_rule() {
+                                Rule::WHITESPACE | Rule::COMMENT => None,
+                                Rule::expression => Some(x.into_inner().next()?.as_rule()),
+                                x => Some(x),
+                            })
+                            .next()
+                            == Some(Rule::left_parenthesis)
+                        {
+                            print_list.push(PrintInfo::new(format!("\n"), PrintType::NewLine));
+                            print_list.push(PrintInfo::new(
+                                format!("{}", iner.as_span().as_str()),
+                                PrintType::None,
+                            ));
+                            print_list.push(PrintInfo::new(format!("\n"), PrintType::NewLine));
+                            *brackets = BracketFormatting::TwoOpening(false, true);
+                        } else {
+                            print_list.push(PrintInfo::new(
+                                format!("{}", iner.as_span().as_str()),
+                                PrintType::NoRightPad,
+                            ));
+                        }
+                    }
                     _ => {
                         print_list.push(PrintInfo::new(
                             format!("{}", iner.as_span().as_str()),
@@ -162,8 +212,6 @@ fn inner_format_expression(
             une => panic!("{:?}{}", une, iner.as_span().as_str()),
         }
     }
-
-    print_list
 }
 
 pub fn format_datatype(data_type: Pair<Rule>) -> String {
