@@ -1,7 +1,5 @@
-use std::iter::{FilterMap, Peekable};
-
 use crate::{format_whitespace, PrintInfo, PrintType, Rule};
-use pest::iterators::{Pair, Pairs};
+use pest::iterators::Pair;
 
 #[derive(PartialEq)]
 enum BracketFormatting {
@@ -281,6 +279,15 @@ fn format_function_content(function_content: Pair<Rule>) -> Vec<PrintInfo> {
                 PrintType::NoSpace,
             )),
             Rule::expression => print_list.append(&mut format_expression(iner, false)),
+            Rule::WHITESPACE => {
+                if let Some(f) = format_whitespace(iner) {
+                    print_list.push(f);
+                }
+            }
+            Rule::COMMENT => print_list.push(PrintInfo::new(
+                format!("{}", iner.as_span().as_str()),
+                PrintType::None,
+            )),
             une => panic!(
                 "{:?},\n{:?} invalid functional content somehow parsed",
                 une, iner

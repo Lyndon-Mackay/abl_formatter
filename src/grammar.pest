@@ -39,7 +39,7 @@ datatype = ${int | big_int | logical | string | date }
 operator = {"+" | "-" | "*" | "/" | "=" | "<" | "<=" | ">" | ">=" | ^"EQ"| ^"NE" | ^"GT" | ^"GE" | ^"LT" | ^"LE" | ^"NOT" | ^"AND" | ^"OR" | "^MATCHES" }
 
 
-subvar = _{ ("_"| (ASCII_ALPHANUMERIC))+ ~  ("-"| "_" | (ASCII_ALPHANUMERIC))* }
+subvar = _{ ("_"| (ASCII_ALPHANUMERIC))+ ~  ("-"| "_" |"/"| (ASCII_ALPHANUMERIC))* }
 
 variable = ${ !(operator ~ WHITESPACE | keyword ~ WHITESPACE) ~ subvar ~ ("." ~ subvar)?  } // used for capturing variables
 
@@ -61,7 +61,7 @@ function = ${
     (keyword | variable) ~ left_parenthesis  ~ (function_content)* ~ right_parenthesis
 }
 
-function_content = { !")" ~ (  keyword | expression | comma )* }
+function_content = { !")" ~ ( WHITESPACE | COMMENT | keyword | expression | comma ) }
 
 /* This is more general then the actual language but not verifying syntax 
 exmaple 5 NOT 2 makes no sense in the abl progress language but for formatting purposes is ok */
@@ -144,7 +144,7 @@ program = { (NEWLINE | include | statement | COMMENT  )* ~ EOI}
 keyword = ${
     (keywords_1 |  keywords_2 | keywords_3 | keywords_4 | keywords_5 | keywords_6 | keywords_7 | keywords_8 | keywords_9 | keywords_10 | keywords_11 | keywords_12 | keywords_13 | keywords_14 
     | keywords_15 | keywords_16 | keywords_17 | keywords_18 | keywords_19 | keywords_20 | keywords_21 | keywords_22 | keywords_23 | keywords_24 | keywords_25 | keywords_26 | keywords_27 
-    | keywords_28) ~ &(WHITESPACE| statement_end| block_begin)
+    | keywords_28) ~ &(WHITESPACE| statement_end ~ WHITESPACE | block_begin | left_parenthesis | right_parenthesis)
 }
 
 keywords_1 = _{
@@ -467,7 +467,7 @@ keywords_25 = _{
 ^"ABSO" | ^"ASCE" | ^"ATTR" | ^"AVER" | ^"BACK" | ^"BELL" | ^"BGC"  | ^"BGCO" | ^"BOTH" | ^"BREAK"| ^"BTOS" | ^"BYTE" | ^"CALL" | ^"CAPS" | ^"CASE" | ^"CHAR" | ^"CODE" | ^"COM1" | ^"COM2" | ^"COM3" 
 | ^"COM4" | ^"COM5" | ^"COM6" | ^"COM7" | ^"COM8" | ^"COM9" | ^"COPY" | ^"CTOS" | ^"CURS" | ^"DATE" | ^"_DCM" | ^"DEBU" | ^"DECI" | ^"DEFI" | ^"DESC" | ^"DICT" | ^"DISP" | ^"DOWN" | ^"DROP" | ^"DUMP" 
 | ^"EACH" | ^"ECHO" | ^"EDGE" | ^"ELSE" | ^"EXCL" | ^"EXIT" | ^"FGCO" | ^"FILE" | ^"FILL" | ^"FIND" | ^"FONT" | ^"FORE" | ^"FORM" | ^"FRAM" | ^"FROM" | ^"GOTO" | ^"HELP" | ^"HIDE" | ^"HINT" | ^"HOME" 
-| ^"HORI" | ^"HWND" | ^"ICON" | ^"INFO" | ^"INIT" | ^"INTE" | ^"INTO" | /*^"ITEM" |  removed due to being used as a variable quite often*/ ^"JOIN" | ^"KEYS" | ^"LAST" | ^"LEFT" | ^"LIKE" | ^"LINE" | ^"LOAD" | ^"LONG" | ^"LPT0" | ^"LPT1" | ^"LPT2" | ^"LPT3" 
+| ^"HORI" | ^"HWND" | ^"ICON" | ^"INFO" | ^"INIT" | ^"INTE" | ^"INTO" | ^"ITEM" | ^"JOIN" | ^"KEYS" | ^"LAST" | ^"LEFT" | ^"LIKE" | ^"LINE" | ^"LOAD" | ^"LONG" | ^"LPT0" | ^"LPT1" | ^"LPT2" | ^"LPT3" 
 | ^"LPT4" | ^"LPT5" | ^"LPT6" | ^"LPT7" | ^"LPT8" | ^"LPT9" | ^"MENU" | ^"MINI" | ^"MOVE" | ^"_MSG" | ^"NAME" | ^"&NEW" | ^"NEXT" | ^"NO-F" | ^"NONE" | ^"NULL" | ^"OPEN" | ^"PAGE" | ^"PERF" | ^"PFCO" 
 | ^"PGDN" | ^"PGUP" | ^"PICK" | ^"PREV" | ^"QUIT" | ^"READ" | ^"REAL" | ^"RECT" | ^"RULE" | ^"SAVE" | ^"SEEK" | ^"SELF" | ^"SEND" | ^"SIZE" | ^"SKIP" | ^"SOME" | ^"SORT" | ^"SQRT" | ^"STOP" | ^"TERM" 
 | ^"TEXT" | ^"THEN" | ^"THRU" | ^"TIME" | ^"TRIM" | ^"TRUE" | ^"TYPE" | ^"UNDO" | ^"UNIX" | ^"USER" | ^"VARI" | ^"VERB" | ^"VERT" | ^"VIEW" | ^"WAIT" | ^"WHEN" | ^"WITH" | ^"X-OF" | ^"XREF" | ^"YEAR" 
