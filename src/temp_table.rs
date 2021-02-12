@@ -1,4 +1,4 @@
-use crate::{format_whitespace, PrintInfo, PrintType, Rule};
+use crate::{format_comment, format_whitespace, PrintInfo, Rule, SpaceType};
 use pad::PadStr;
 use pest::iterators::{Pair, Pairs};
 
@@ -33,12 +33,12 @@ pub fn format_temp_table(temp_table: Pair<Rule>) -> Vec<PrintInfo> {
             Rule::define_keyword | Rule::keyword | Rule::temptable_keyword => {
                 print_list.push(PrintInfo::new(
                     format!("{}", iner.as_span().as_str().to_uppercase()),
-                    PrintType::None,
+                    SpaceType::None,
                 ))
             }
             Rule::variable => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str()),
-                PrintType::None,
+                SpaceType::None,
             )),
             Rule::temp_table_like => print_list.append(&mut format_temp_table_like(iner)),
             Rule::temp_table_fields => print_list.append(&mut format_temp_table_fields(iner)),
@@ -60,11 +60,11 @@ fn format_temp_table_like(like_field: Pair<Rule>) -> Vec<PrintInfo> {
         match iner.as_rule() {
             Rule::like_keyword | Rule::keyword => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str().to_uppercase()),
-                PrintType::None,
+                SpaceType::None,
             )),
             Rule::variable => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str()),
-                PrintType::None,
+                SpaceType::None,
             )),
             Rule::WHITESPACE | Rule::NEWLINE => {
                 if let Some(f) = format_whitespace(iner) {
@@ -99,8 +99,8 @@ fn format_temp_table_fields(fields: Pair<Rule>) -> Vec<PrintInfo> {
             // line.push_str(&format!(" "));
             line.push_str(&mut curr.after_variable);
 
-            acc.push(PrintInfo::new(line, PrintType::None));
-            acc.push(PrintInfo::new(format!("\n"), PrintType::NewLine));
+            acc.push(PrintInfo::new(line, SpaceType::None));
+            acc.push(PrintInfo::new(format!("\n"), SpaceType::NewLine));
             acc
         },
     );
@@ -144,7 +144,7 @@ fn format_temp_table_single_field_process_to_variable(
                     before_variable_string.push_str(&f.line);
                 }
             }
-            Rule::COMMENT => before_variable_string.push_str(next.as_str()),
+            Rule::COMMENT => before_variable_string.push_str(&format_comment(next)),
             _ => panic!("unexpected format to variable"),
         }
     };

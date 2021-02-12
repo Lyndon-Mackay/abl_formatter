@@ -1,4 +1,6 @@
-use crate::{expression::format_expression, format_whitespace, PrintInfo, PrintType, Rule};
+use crate::{
+    expression::format_expression, format_comment, format_whitespace, PrintInfo, Rule, SpaceType,
+};
 use pad::PadStr;
 use pest::iterators::{Pair, Pairs};
 
@@ -69,11 +71,11 @@ pub fn format_assign(assign: Pair<Rule>) -> Vec<PrintInfo> {
             | Rule::framebrowse_keyword
             | Rule::noerror_keyword => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str().to_uppercase()),
-                PrintType::None,
+                SpaceType::None,
             )),
             Rule::variable => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str()),
-                PrintType::None,
+                SpaceType::None,
             )),
             Rule::assign_lines => print_list.append(&mut format_assign_lines(iner)),
             Rule::WHITESPACE => {}
@@ -106,7 +108,7 @@ fn format_assign_lines(lines: Pair<Rule>) -> Vec<PrintInfo> {
             inner_list.append(&mut x.before_var);
             inner_list.push(PrintInfo::new(
                 x.variable.pad_to_width(longest),
-                PrintType::None,
+                SpaceType::None,
             ));
             inner_list.append(&mut x.before_assign_expr);
             inner_list.append(&mut x.assign_expr);
@@ -135,7 +137,7 @@ fn format_assign_single_line(line: Pair<Rule>) -> AssignLinePrintInfo {
             let (before_when_expr, when_expr) = get_to_expression(&mut iter);
             let post_expr = iter
                 .filter_map(|x| match x.as_rule() {
-                    Rule::COMMENT => Some(PrintInfo::new(x.as_str().to_string(), PrintType::None)),
+                    Rule::COMMENT => Some(PrintInfo::new(format_comment(x), SpaceType::None)),
                     Rule::WHITESPACE => format_whitespace(x),
                     _ => None,
                 })
@@ -165,7 +167,7 @@ fn get_to_variable(iter: &mut Pairs<Rule>) -> (Vec<PrintInfo>, String) {
         let next = iter.next().expect("invalid assign");
         match next.as_rule() {
             Rule::COMMENT => {
-                before_var.push(PrintInfo::new(next.as_str().to_string(), PrintType::None))
+                before_var.push(PrintInfo::new(next.as_str().to_string(), SpaceType::None))
             }
             Rule::variable => break next.as_str().to_string(),
             Rule::WHITESPACE => {}
@@ -181,13 +183,13 @@ fn get_to_assign_expression(iter: &mut Pairs<Rule>) -> (Vec<PrintInfo>, Vec<Prin
         let next = iter.next().expect("invalid assign");
         match next.as_rule() {
             Rule::COMMENT => {
-                before_expr.push(PrintInfo::new(next.as_str().to_string(), PrintType::None))
+                before_expr.push(PrintInfo::new(next.as_str().to_string(), SpaceType::None))
             }
             Rule::expression => {
                 break format_expression(next, true);
             }
             Rule::equals => {
-                before_expr.push(PrintInfo::new(next.as_str().to_string(), PrintType::None))
+                before_expr.push(PrintInfo::new(next.as_str().to_string(), SpaceType::None))
             }
             Rule::WHITESPACE => {}
             une => panic!(" unexpected assign {:?}", une),
@@ -205,10 +207,10 @@ fn get_to_when_keyword(iter: &mut Pairs<Rule>) -> (Vec<PrintInfo>, Option<PrintI
         };
         match next.as_rule() {
             Rule::COMMENT => {
-                before_when.push(PrintInfo::new(next.as_str().to_string(), PrintType::None))
+                before_when.push(PrintInfo::new(next.as_str().to_string(), SpaceType::None))
             }
             Rule::when_keyword => {
-                break Some(PrintInfo::new(next.as_str().to_string(), PrintType::None))
+                break Some(PrintInfo::new(next.as_str().to_string(), SpaceType::None))
             }
             Rule::WHITESPACE => {
                 if let Some(line) = format_whitespace(next) {
@@ -228,7 +230,7 @@ fn get_to_expression(iter: &mut Pairs<Rule>) -> (Vec<PrintInfo>, Vec<PrintInfo>)
 
         match next.as_rule() {
             Rule::COMMENT => {
-                before_expr.push(PrintInfo::new(next.as_str().to_string(), PrintType::None))
+                before_expr.push(PrintInfo::new(format_comment(next), SpaceType::None))
             }
             Rule::expression => break format_expression(next, true),
             Rule::WHITESPACE => {}

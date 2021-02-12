@@ -8,6 +8,10 @@ use std::{
     io::{stdin, BufRead, BufReader},
 };
 
+use lazy_static::lazy_static;
+
+use regex::Regex;
+
 use assign::format_assign;
 use expression::{format_conditional_expression, format_datatype, format_expression};
 use pest::{iterators::Pair, Parser};
@@ -21,8 +25,12 @@ pub enum IoType {
     FromStdIn,
     FromFile(String),
 }
+/**
+    store special printing instructions related to spacing
+    or words require speical spacing
+*/
 #[derive(PartialEq)]
-enum PrintType {
+enum SpaceType {
     None,
     NoSpace, //no space from previous word
     End,
@@ -33,11 +41,11 @@ enum PrintType {
 }
 pub struct PrintInfo {
     line: String,
-    spacing_attribute: PrintType,
+    spacing_attribute: SpaceType,
 }
 
 impl PrintInfo {
-    fn new(line: String, spacing_attribute: PrintType) -> Self {
+    fn new(line: String, spacing_attribute: SpaceType) -> Self {
         Self {
             line,
             spacing_attribute,
@@ -71,13 +79,9 @@ pub fn format_code(input: IoType) {
     let mut indent_level = 0;
     for parse_pair in sucessful_parse {
         for iner in parse_pair.into_inner() {
-            match &iner.as_rule() {
+            match iner.as_rule() {
                 Rule::COMMENT => {
-                    print!(
-                        "{}{}",
-                        get_tabs(indent_level),
-                        iner.clone().as_span().as_str()
-                    );
+                    print!("{}{}", get_tabs(indent_level), format_comment(iner));
                 }
                 Rule::statement => indent_level = format_statement(iner.clone(), indent_level),
                 Rule::WHITESPACE => {
@@ -104,18 +108,20 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
     let mut print_list = Vec::new();
     let mut next_indent = indent_level;
 
+    /* statements require deeper analysis as printing current words can be context sensitive to later upcoming words
+     */
     for iner in statement.into_inner() {
         match iner.as_rule() {
             Rule::loop_label => {
                 print_list.push(PrintInfo::new(
                     format!("{}", iner.as_span().as_str()),
-                    PrintType::NoSpace,
+                    SpaceType::NoSpace,
                 ));
             }
             Rule::keyword => {
                 print_list.push(PrintInfo::new(
                     format!("{}", &iner.as_span().as_str().to_uppercase()),
-                    PrintType::None,
+                    SpaceType::None,
                 ));
             }
             Rule::conditional_expression => {
@@ -127,14 +133,14 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
             Rule::block_begin => {
                 print_list.push(PrintInfo::new(
                     format!("{}", iner.as_span().as_str()),
-                    PrintType::NoSpace,
+                    SpaceType::NoSpace,
                 ));
                 next_indent += 1;
             }
             Rule::block_end => {
                 print_list.push(PrintInfo::new(
                     format!("{}", &iner.as_span().as_str()).to_uppercase(),
-                    PrintType::End,
+                    SpaceType::End,
                 ));
                 if next_indent > 0 {
                     next_indent -= 1
@@ -158,17 +164,18 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
             }
             Rule::statement_end => print_list.push(PrintInfo::new(
                 format!("{}", &iner.as_span().as_str().to_uppercase()),
-                PrintType::End,
+                SpaceType::End,
             )),
             Rule::datatype => print_list.push(PrintInfo::new(
                 format!("{}", &format_datatype(iner)),
-                PrintType::None,
+                SpaceType::None,
             )),
 
             _ => eprint!("+++++{:?}+++++++", iner.as_rule()),
         }
     }
 
+    /*actual printing of the words */
     let mut words_iter = print_list.into_iter().enumerate().peekable();
     let mut prev_spacing = None;
     loop {
@@ -178,11 +185,11 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
                 break;
             }
         };
-        if i == 0 && word.spacing_attribute != PrintType::End {
+        if i == 0 && word.spacing_attribute != SpaceType::End {
             print!("{}{}", get_tabs(indent_level), word.line.trim());
             continue;
         }
-        if word.spacing_attribute == PrintType::End {
+        if word.spacing_attribute == SpaceType::End {
             if words_iter.peek().is_none() {
                 if indent_level == 0 {
                     print!("{} ", word.line.trim())
@@ -200,38 +207,38 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
         }
         match word.spacing_attribute {
             //extra indent specific behaviour handled at newline
-            PrintType::None | PrintType::ExtraIndent | PrintType::NoRightPad => {
+            SpaceType::None | SpaceType::ExtraIndent | SpaceType::NoRightPad => {
                 match prev_spacing {
-                    Some(PrintType::NoRightPad) | Some(PrintType::ExtraIndent) => {
+                    Some(SpaceType::NoRightPad) | Some(SpaceType::ExtraIndent) => {
                         print!("{}", word.line.trim())
                     }
                     _ => print!(" {}", word.line.trim()),
                 }
             }
-            PrintType::TabPadRight => {
+            SpaceType::TabPadRight => {
                 print!("{}\t", word.line.trim());
             }
-            PrintType::NoSpace => {
+            SpaceType::NoSpace => {
                 print!("{}", word.line.trim())
             }
-            PrintType::End => {
+            SpaceType::End => {
                 if words_iter.peek().is_none() {
                     print!("{} ", word.line.trim());
                 } else {
                     print!("{}", word.line.trim())
                 }
             }
-            PrintType::NewLine => {
+            SpaceType::NewLine => {
                 let followup = words_iter.peek();
 
                 match followup {
                     Some((_, peeked_print_info))
-                        if peeked_print_info.spacing_attribute == PrintType::NewLine =>
+                        if peeked_print_info.spacing_attribute == SpaceType::NewLine =>
                     {
                         println!("")
                     }
                     Some((_, peeked_print_info))
-                        if peeked_print_info.spacing_attribute == PrintType::End =>
+                        if peeked_print_info.spacing_attribute == SpaceType::End =>
                     {
                         println!("");
                         if indent_level > 0 {
@@ -239,19 +246,12 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
                         }
                     }
                     Some((_, peeked_print_info))
-                        if peeked_print_info.spacing_attribute == PrintType::ExtraIndent =>
+                        if peeked_print_info.spacing_attribute == SpaceType::ExtraIndent =>
                     {
                         println!();
 
                         print!("{}", get_tabs(indent_level + 2))
                     }
-                    /*Some((_, peeked_print_info))
-                        if peeked_print_info.spacing_attribute == PrintType::NoRightPad =>
-                    {
-                        println!();
-
-                        print!("{}", get_tabs(indent_level + 2))
-                    }*/
                     _ => {
                         println!("");
                         print!("{}", get_tabs(indent_level + 1))
@@ -279,14 +279,14 @@ fn format_whitespace(white_space: Pair<Rule>) -> Option<PrintInfo> {
             Rule::NEWLINE => {
                 return Some(PrintInfo::new(
                     format!("{}", iner.as_span().as_str()),
-                    PrintType::NewLine,
+                    SpaceType::NewLine,
                 ))
             }
             _ => {
                 return if white_space.as_str().contains("\n") {
                     Some(PrintInfo::new(
                         format!("{}", white_space.as_str()),
-                        PrintType::NewLine,
+                        SpaceType::NewLine,
                     ))
                 } else {
                     None
@@ -297,11 +297,24 @@ fn format_whitespace(white_space: Pair<Rule>) -> Option<PrintInfo> {
             if white_space.as_str().contains("\n") {
                 Some(PrintInfo::new(
                     format!("{}", white_space.as_str()),
-                    PrintType::NewLine,
+                    SpaceType::NewLine,
                 ))
             } else {
                 None
             }
         }
     }
+}
+
+fn format_comment(comment: Pair<Rule>) -> String {
+    lazy_static! {
+        static ref open: Regex = Regex::new(r"/\* ?").unwrap();
+        static ref close: Regex = Regex::new(r" ?\*/").unwrap();
+    }
+
+    let open_spaced = open.replace(comment.as_str(), "/* ");
+
+    let closed_spaced = close.replace(&open_spaced, " */");
+
+    closed_spaced.into_owned()
 }

@@ -1,4 +1,4 @@
-use crate::{format_whitespace, PrintInfo, PrintType, Rule};
+use crate::{format_comment, format_whitespace, PrintInfo, Rule, SpaceType};
 use pest::iterators::Pair;
 
 #[derive(PartialEq)]
@@ -15,7 +15,7 @@ pub fn format_conditional_expression(conditional_expression: Pair<Rule>) -> Vec<
             Rule::conditional_expression_pred => {
                 print_list.push(PrintInfo::new(
                     format!("{}", &iner.as_span().as_str().to_uppercase()),
-                    PrintType::None,
+                    SpaceType::None,
                 ));
             }
             Rule::expression => print_list.append(&mut format_expression(iner, true)),
@@ -26,7 +26,7 @@ pub fn format_conditional_expression(conditional_expression: Pair<Rule>) -> Vec<
             }
             Rule::COMMENT => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str()),
-                PrintType::None,
+                SpaceType::None,
             )),
             une => panic!(
                 "{:?},\n{:?} invalid conditional expression somehow parsed",
@@ -90,7 +90,7 @@ fn inner_format_expression(
             Rule::keyword => {
                 print_list.push(PrintInfo::new(
                     format!("{}", &iner.as_span().as_str().to_uppercase()),
-                    PrintType::None,
+                    SpaceType::None,
                 ));
             }
             Rule::operator => {
@@ -107,16 +107,16 @@ fn inner_format_expression(
                         .next()
                         == Some(Rule::left_parenthesis)
                 {
-                    PrintType::TabPadRight
+                    SpaceType::TabPadRight
                 } else {
-                    PrintType::None
+                    SpaceType::None
                 };
 
                 print_list.push(PrintInfo::new(format_operator(iner, conditional), pr_type))
             }
             Rule::COMMENT => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str()),
-                PrintType::None,
+                SpaceType::None,
             )),
             Rule::expression => {
                 print_list.append(&mut inner_format_expression(
@@ -136,22 +136,22 @@ fn inner_format_expression(
             Rule::variable => {
                 print_list.push(PrintInfo::new(
                     format!("{}", iner.as_span().as_str()),
-                    PrintType::None,
+                    SpaceType::None,
                 ));
             }
             Rule::datatype => print_list.push(PrintInfo::new(
                 format!("{}", &format_datatype(iner)),
-                PrintType::None,
+                SpaceType::None,
             )),
             Rule::function => print_list.append(&mut format_function(iner)),
             Rule::right_parenthesis => {
                 *unclosed_left_count -= 1;
                 print_list.push(PrintInfo::new(
                     format!("{}", iner.as_span().as_str()),
-                    PrintType::NoSpace,
+                    SpaceType::NoSpace,
                 ));
                 if *unclosed_left_count == 1 && *brackets != BracketFormatting::None {
-                    print_list.push(PrintInfo::new(format!("\n"), PrintType::NewLine));
+                    print_list.push(PrintInfo::new(format!("\n"), SpaceType::NewLine));
                 }
             }
             Rule::left_parenthesis => {
@@ -161,15 +161,15 @@ fn inner_format_expression(
                     BracketFormatting::TwoOpening(f, _) if *f => {
                         print_list.push(PrintInfo::new(
                             format!("{}", iner.as_span().as_str()),
-                            PrintType::None,
+                            SpaceType::None,
                         ));
-                        print_list.push(PrintInfo::new(format!("\n"), PrintType::NewLine));
+                        print_list.push(PrintInfo::new(format!("\n"), SpaceType::NewLine));
                         *brackets = BracketFormatting::TwoOpening(false, true);
                     }
                     BracketFormatting::TwoOpening(_, f2) if *f2 => {
                         print_list.push(PrintInfo::new(
                             format!("{}", iner.as_span().as_str()),
-                            PrintType::ExtraIndent,
+                            SpaceType::ExtraIndent,
                         ));
                         *brackets = BracketFormatting::TwoOpening(false, false);
                     }
@@ -185,24 +185,24 @@ fn inner_format_expression(
                             .next()
                             == Some(Rule::left_parenthesis)
                         {
-                            print_list.push(PrintInfo::new(format!("\n"), PrintType::NewLine));
+                            print_list.push(PrintInfo::new(format!("\n"), SpaceType::NewLine));
                             print_list.push(PrintInfo::new(
                                 format!("{}", iner.as_span().as_str()),
-                                PrintType::None,
+                                SpaceType::None,
                             ));
-                            print_list.push(PrintInfo::new(format!("\n"), PrintType::NewLine));
+                            print_list.push(PrintInfo::new(format!("\n"), SpaceType::NewLine));
                             *brackets = BracketFormatting::TwoOpening(false, true);
                         } else {
                             print_list.push(PrintInfo::new(
                                 format!("{}", iner.as_span().as_str()),
-                                PrintType::NoRightPad,
+                                SpaceType::NoRightPad,
                             ));
                         }
                     }
                     _ => {
                         print_list.push(PrintInfo::new(
                             format!("{}", iner.as_span().as_str()),
-                            PrintType::NoRightPad,
+                            SpaceType::NoRightPad,
                         ));
                     }
                 }
@@ -243,15 +243,15 @@ fn format_function(function: Pair<Rule>) -> Vec<PrintInfo> {
         match iner.as_rule() {
             Rule::keyword => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str().to_uppercase()),
-                PrintType::None,
+                SpaceType::None,
             )),
             Rule::variable => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str()),
-                PrintType::None,
+                SpaceType::None,
             )),
             Rule::left_parenthesis | Rule::right_parenthesis => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str()),
-                PrintType::NoSpace,
+                SpaceType::NoSpace,
             )),
             Rule::function_content => print_list.append(&mut format_function_content(iner)),
             une => panic!("{:?},\n{:?} invalid function somehow parsed", une, iner),
@@ -268,15 +268,15 @@ fn format_function_content(function_content: Pair<Rule>) -> Vec<PrintInfo> {
         match iner.as_rule() {
             Rule::keyword => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str().to_uppercase()),
-                PrintType::None,
+                SpaceType::None,
             )),
             Rule::variable => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str()),
-                PrintType::None,
+                SpaceType::None,
             )),
             Rule::comma => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str()),
-                PrintType::NoSpace,
+                SpaceType::NoSpace,
             )),
             Rule::expression => print_list.append(&mut format_expression(iner, false)),
             Rule::WHITESPACE => {
@@ -284,10 +284,7 @@ fn format_function_content(function_content: Pair<Rule>) -> Vec<PrintInfo> {
                     print_list.push(f);
                 }
             }
-            Rule::COMMENT => print_list.push(PrintInfo::new(
-                format!("{}", iner.as_span().as_str()),
-                PrintType::None,
-            )),
+            Rule::COMMENT => print_list.push(PrintInfo::new(format_comment(iner), SpaceType::None)),
             une => panic!(
                 "{:?},\n{:?} invalid functional content somehow parsed",
                 une, iner
