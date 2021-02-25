@@ -97,8 +97,11 @@ pub fn format_code(input: IoType) {
                 Rule::include => {
                     println!("{}{}", get_tabs(indent_level), iner.as_span().as_str())
                 }
+                Rule::NEWLINE => {
+                    println!();
+                }
                 Rule::EOI => {}
-                _ => panic!("unrecongised program"),
+                _ => panic!("unrecongised program {:?}",iner.as_rule()),
             };
         }
     }
@@ -111,6 +114,8 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
     /* statements require deeper analysis as printing current words can be context sensitive to later upcoming words
      */
     for iner in statement.into_inner() {
+        
+        println!("{:?}",iner.as_rule());
         match iner.as_rule() {
             Rule::loop_label => {
                 print_list.push(PrintInfo::new(
@@ -308,13 +313,13 @@ fn format_whitespace(white_space: Pair<Rule>) -> Option<PrintInfo> {
 
 fn format_comment(comment: Pair<Rule>) -> String {
     lazy_static! {
-        static ref open: Regex = Regex::new(r"/\* ?").unwrap();
-        static ref close: Regex = Regex::new(r" ?\*/").unwrap();
+        static ref OPEN: Regex = Regex::new(r"/\* ?").unwrap();
+        static ref CLOSE: Regex = Regex::new(r" ?\*/").unwrap();
     }
 
-    let open_spaced = open.replace(comment.as_str(), "/* ");
+    let open_spaced = OPEN.replace(comment.as_str(), "/* ");
 
-    let closed_spaced = close.replace(&open_spaced, " */");
+    let closed_spaced = CLOSE.replace(&open_spaced, " */");
 
     closed_spaced.into_owned()
 }

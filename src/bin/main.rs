@@ -2,9 +2,9 @@ extern crate clap;
 use abl_formatter::*;
 use clap::{App, Arg};
 fn main() {
-    let options = App::new("Recut")
+    let options = App::new("abl_formatter")
     .version("0.1")
-    .about("Similar to cut but with unicode support and inferred delimiters")
+    .about("Formats abl progres code making all keywords uppercase and setting consistent indentation rules")
     .arg(
         Arg::with_name("FILE")
         .index(1)

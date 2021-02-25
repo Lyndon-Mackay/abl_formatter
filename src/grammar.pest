@@ -39,7 +39,7 @@ datatype = ${int | big_int | logical | string | date }
 operator = {"+" | "-" | "*" | "/" | "=" | "<" | "<=" | ">" | ">=" | ^"EQ"| ^"NE" | ^"GT" | ^"GE" | ^"LT" | ^"LE" | ^"NOT" | ^"AND" | ^"OR" | "^MATCHES" }
 
 
-subvar = _{ ("_"| (ASCII_ALPHANUMERIC))+ ~  ("-"| "_" |"/"| (ASCII_ALPHANUMERIC))* }
+subvar = _{ ("_"| "$"| (ASCII_ALPHANUMERIC))+ ~  ("-"| "$"| "_" |"/"| (ASCII_ALPHANUMERIC))* }
 
 variable = ${ !(operator ~ WHITESPACE | keyword ~ WHITESPACE) ~ subvar ~ ("." ~ subvar)?  } // used for capturing variables
 
@@ -47,7 +47,7 @@ block_begin = { ":"}
 
 loop_label = @{ variable~ ":"}
 
-block_end = { ^"END" ~ "PROCEDURE" ~ "." | ^"END" ~ "."}
+block_end = { ^"END" ~ ^"procedure" ~ "." | ^"END" ~ "."}
 
 statement_end = { "." }
 
@@ -135,7 +135,7 @@ inner_include = { (!("}"|"{") ~ ANY)*}
 
 statement = { 
     loop_label | block_end | 
-    (( define_temp_table | assign_statement | conditional_expression | keyword | expression |  datatype)* 
+    (( define_temp_table | assign_statement | conditional_expression | keyword | comma | expression |  datatype)* 
     ~ ( block_begin |  statement_end ))
 }
 
@@ -144,7 +144,7 @@ program = { (NEWLINE | include | statement | COMMENT  )* ~ EOI}
 keyword = ${
     (keywords_1 |  keywords_2 | keywords_3 | keywords_4 | keywords_5 | keywords_6 | keywords_7 | keywords_8 | keywords_9 | keywords_10 | keywords_11 | keywords_12 | keywords_13 | keywords_14 
     | keywords_15 | keywords_16 | keywords_17 | keywords_18 | keywords_19 | keywords_20 | keywords_21 | keywords_22 | keywords_23 | keywords_24 | keywords_25 | keywords_26 | keywords_27 
-    | keywords_28) ~ &(WHITESPACE| statement_end ~ WHITESPACE | block_begin | left_parenthesis | right_parenthesis)
+    | keywords_28) ~ &(WHITESPACE| statement_end ~ (EOI | WHITESPACE) | block_begin  | comma| left_parenthesis | right_parenthesis)
 }
 
 keywords_1 = _{
