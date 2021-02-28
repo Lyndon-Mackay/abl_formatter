@@ -1,6 +1,7 @@
 extern crate pest;
 mod assign;
 mod expression;
+mod function;
 mod temp_table;
 
 use std::{
@@ -14,12 +15,15 @@ use regex::Regex;
 
 use assign::format_assign;
 use expression::{format_conditional_expression, format_datatype, format_expression};
+use function::format_function_declaration;
 use pest::{iterators::Pair, Parser};
 use temp_table::format_temp_table;
 
 #[macro_use]
 extern crate pest_derive;
 
+#[macro_use]
+extern crate if_chain;
 #[derive(Debug)]
 pub enum IoType {
     FromStdIn,
@@ -32,12 +36,13 @@ pub enum IoType {
 #[derive(PartialEq)]
 enum SpaceType {
     None,
-    NoSpace, //no space from previous word
+    NoLeftPad, //no space from previous word
     End,
     NewLine,
     ExtraIndent,
     NoRightPad,
     TabPadRight,
+    NoSpace,
 }
 pub struct PrintInfo {
     line: String,
@@ -101,7 +106,7 @@ pub fn format_code(input: IoType) {
                     println!();
                 }
                 Rule::EOI => {}
-                _ => panic!("unrecongised program {:?}",iner.as_rule()),
+                _ => panic!("unrecongised program {:?}", iner.as_rule()),
             };
         }
     }
@@ -114,14 +119,16 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
     /* statements require deeper analysis as printing current words can be context sensitive to later upcoming words
      */
     for iner in statement.into_inner() {
-        
-        println!("{:?}",iner.as_rule());
+        //println!("{:?}",iner.as_rule());
         match iner.as_rule() {
-            Rule::loop_label => {
+            Rule::loop_label | Rule::comma |Rule::properties_sigil => {
                 print_list.push(PrintInfo::new(
                     format!("{}", iner.as_span().as_str()),
-                    SpaceType::NoSpace,
+                    SpaceType::NoLeftPad,
                 ));
+            }
+            Rule::properties => {
+                print_list.append(& mut format_properties(iner))
             }
             Rule::keyword => {
                 print_list.push(PrintInfo::new(
@@ -135,10 +142,11 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
             Rule::expression => {
                 print_list.append(&mut format_expression(iner, false));
             }
+            Rule::function_declaration => print_list.append(&mut format_function_declaration(iner)),
             Rule::block_begin => {
                 print_list.push(PrintInfo::new(
                     format!("{}", iner.as_span().as_str()),
-                    SpaceType::NoSpace,
+                    SpaceType::NoLeftPad,
                 ));
                 next_indent += 1;
             }
@@ -171,10 +179,7 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
                 format!("{}", &iner.as_span().as_str().to_uppercase()),
                 SpaceType::End,
             )),
-            Rule::datatype => print_list.push(PrintInfo::new(
-                format!("{}", &format_datatype(iner)),
-                SpaceType::None,
-            )),
+            Rule::datatype => print_list.append(&mut format_datatype(iner)),
 
             _ => eprint!("+++++{:?}+++++++", iner.as_rule()),
         }
@@ -213,15 +218,33 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
         match word.spacing_attribute {
             //extra indent specific behaviour handled at newline
             SpaceType::None | SpaceType::ExtraIndent | SpaceType::NoRightPad => {
-                match prev_spacing {
-                    Some(SpaceType::NoRightPad) | Some(SpaceType::ExtraIndent) => {
+                //if next word contains no spacing
+
+                match (prev_spacing, words_iter.peek()) {
+                    (_, Some(next)) if next.1.spacing_attribute == SpaceType::NoSpace 
+                    && word.spacing_attribute != SpaceType::None=> {
+                        //println!("lily");
+                        print!(" {}", word.line.trim())
+                    }
+                    (Some(prev), _)
+                        if prev ==  SpaceType::NoRightPad
+                            ||  prev == SpaceType::ExtraIndent
+                            || prev == SpaceType::NoSpace =>
+                    {
+                     //   println!("test");
                         print!("{}", word.line.trim())
                     }
-                    _ => print!(" {}", word.line.trim()),
+                    _ => {
+                      //  println!("third");
+                        print!(" {}", word.line.trim())
+                    }
                 }
             }
             SpaceType::TabPadRight => {
                 print!("{}\t", word.line.trim());
+            }
+            SpaceType::NoLeftPad => {
+                print!("{}", word.line.trim())
             }
             SpaceType::NoSpace => {
                 print!("{}", word.line.trim())
@@ -322,4 +345,28 @@ fn format_comment(comment: Pair<Rule>) -> String {
     let closed_spaced = CLOSE.replace(&open_spaced, " */");
 
     closed_spaced.into_owned()
+}
+
+fn format_properties(properties:Pair<Rule>) -> Vec<PrintInfo>{
+    let mut print_list = Vec::new();
+    for iner in properties.into_inner(){
+        match iner.as_rule() {
+            Rule::variable => print_list.push(PrintInfo::new(
+                format!("{}", iner.as_span().as_str()),
+                SpaceType::None,
+            )),
+            Rule::properties_sigil => print_list.push(PrintInfo::new(
+                format!("{}", iner.as_span().as_str()),
+                SpaceType::NoSpace,
+            )),
+            Rule::keyword => {
+                print_list.push(PrintInfo::new(
+                    format!("{}", iner.as_span().as_str().to_uppercase()),
+                    SpaceType::None,
+                ))
+            }
+            _ => panic!("unhandled property")
+        }
+    }
+    print_list
 }

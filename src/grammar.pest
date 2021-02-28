@@ -32,18 +32,24 @@ decimal = {ASCII_DIGIT{1,40} ~ "." ~ASCII_DIGIT{1,10} }
 
 big_int = {"-"? ~ ASCII_DIGIT{1,19}}
 int = {"-"? ~ ASCII_DIGIT{1,10}}
-logical = {^"TRUE"|^"FALSE"|^"YES"|^"NO"}
+logical = {(^"TRUE"|^"FALSE"|^"YES"|^"NO") ~ !("-"|":"|ASCII_ALPHANUMERIC)}
 
-datatype = ${int | big_int | logical | string | date }
+
+right_square_bracket = {"]"}
+left_square_bracket = {"["}
+
+array_data = {variable? ~ left_square_bracket ~ ((datatype|variable) ~ comma)* ~ (datatype|variable)? ~ right_square_bracket }
+datatype = ${int | big_int | logical | string | date | array_data} 
 
 operator = {"+" | "-" | "*" | "/" | "=" | "<" | "<=" | ">" | ">=" | ^"EQ"| ^"NE" | ^"GT" | ^"GE" | ^"LT" | ^"LE" | ^"NOT" | ^"AND" | ^"OR" | "^MATCHES" }
 
+not = { ^"NOT"}
 
-subvar = _{ ("_"| "$"| (ASCII_ALPHANUMERIC))+ ~  ("-"| "$"| "_" |"/"| (ASCII_ALPHANUMERIC))* }
+subvar = _{ ("_"| "$"| (ASCII_ALPHANUMERIC))+ ~  ("-"| "$"| "_" |"/"|"\\"| (ASCII_ALPHANUMERIC))* }
 
-variable = ${ !(operator ~ WHITESPACE | keyword ~ WHITESPACE) ~ subvar ~ ("." ~ subvar)?  } // used for capturing variables
+variable = ${ !(operator ~ WHITESPACE | keyword ~ (WHITESPACE| "." | ":")) ~ subvar ~ ("." ~ subvar)?  } // used for capturing variables
 
-block_begin = { ":"}
+block_begin = ${ ":" ~ &WHITESPACE}
 
 loop_label = @{ variable~ ":"}
 
@@ -66,12 +72,13 @@ function_content = { !")" ~ ( WHITESPACE | COMMENT | keyword | expression | comm
 /* This is more general then the actual language but not verifying syntax 
 exmaple 5 NOT 2 makes no sense in the abl progress language but for formatting purposes is ok */
 expression = {
-    datatype ~ (operator ~ expression )?  |
+    not ~ (function | logical | variable) ~ expression? |
     function ~ (operator ~ expression)? |
+    datatype ~ (operator ~ expression )?  |
     (!^"WHEN" ~ keyword) ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
     variable ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
     variable ~( operator ~ expression)?   |
-    left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)?
+    left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? 
 
 }
 
@@ -130,12 +137,24 @@ assign_statement = {
     ~ noerror_keyword?
 }
 
+function_keyword  = {^"function"}
+
+forward_marker = {^"forward" | ^"in" | ^"map"}
+
+//extremely lenient comapred to actual function syntax
+function_declaration = {
+   function_keyword ~ variable ~ (keyword | variable)* ~ left_parenthesis ~ function_content* ~ right_parenthesis ~ forward_marker ~ (keyword | variable)*
+}
+
 include = ${ "{" ~ inner_include ~ ("}"| (include ~ inner_include)* ~ "}" )  }
 inner_include = { (!("}"|"{") ~ ANY)*}
 
+properties_sigil = ${":"}
+properties = ${(keyword|variable) ~ properties_sigil ~ (keyword |variable) }
+
 statement = { 
     loop_label | block_end | 
-    (( define_temp_table | assign_statement | conditional_expression | keyword | comma | expression |  datatype)* 
+    (( define_temp_table | assign_statement | function_declaration | properties| conditional_expression | expression | keyword | comma |  datatype  )* 
     ~ ( block_begin |  statement_end ))
 }
 
