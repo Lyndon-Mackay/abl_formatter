@@ -16,6 +16,7 @@ pub fn format_function(function: Pair<Rule>) -> Vec<PrintInfo> {
                 format!("{}", iner.as_span().as_str()),
                 SpaceType::None,
             )),
+            Rule::function_start => print_list.append(&mut format_function(iner)),
             Rule::left_parenthesis => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str()),
                 SpaceType::NoSpace,
@@ -24,6 +25,12 @@ pub fn format_function(function: Pair<Rule>) -> Vec<PrintInfo> {
                 format!("{}", iner.as_span().as_str()),
                 SpaceType::NoLeftPad,
             )),
+            Rule::WHITESPACE => {
+                if let Some(f) = format_whitespace(iner) {
+                    print_list.push(f);
+                }
+            }
+            Rule::COMMENT => print_list.push(PrintInfo::new(format_comment(iner), SpaceType::None)),
             Rule::function_content => print_list.append(&mut format_function_content(iner)),
             une => panic!("{:?},\n{:?} invalid function somehow parsed", une, iner),
         }

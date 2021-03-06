@@ -14,7 +14,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 
 use assign::format_assign;
-use expression::{format_conditional_expression, format_datatype, format_expression};
+use expression::{format_by_expression,format_accumulate,format_conditional_expression, format_datatype, format_expression};
 use function::format_function_declaration;
 use pest::{iterators::Pair, Parser};
 use temp_table::format_temp_table;
@@ -22,8 +22,6 @@ use temp_table::format_temp_table;
 #[macro_use]
 extern crate pest_derive;
 
-#[macro_use]
-extern crate if_chain;
 #[derive(Debug)]
 pub enum IoType {
     FromStdIn,
@@ -136,11 +134,17 @@ fn format_statement(statement: Pair<Rule>, indent_level: usize) -> usize {
                     SpaceType::None,
                 ));
             }
+            Rule::by_expression => {
+                print_list.append(&mut format_by_expression(iner))
+            }
             Rule::conditional_expression => {
                 print_list.append(&mut format_conditional_expression(iner))
             }
             Rule::expression => {
                 print_list.append(&mut format_expression(iner, false));
+            }
+            Rule::accumulate => {
+                print_list.append(&mut format_accumulate(iner))
             }
             Rule::function_declaration => print_list.append(&mut format_function_declaration(iner)),
             Rule::block_begin => {

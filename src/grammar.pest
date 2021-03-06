@@ -33,17 +33,19 @@ decimal = {ASCII_DIGIT{1,40} ~ "." ~ASCII_DIGIT{1,10} }
 big_int = {"-"? ~ ASCII_DIGIT{1,19}}
 int = {"-"? ~ ASCII_DIGIT{1,10}}
 logical = {(^"TRUE"|^"FALSE"|^"YES"|^"NO") ~ !("-"|":"|ASCII_ALPHANUMERIC)}
+null = {"?"}
 
 
 right_square_bracket = {"]"}
 left_square_bracket = {"["}
 
 array_data = {variable? ~ left_square_bracket ~ ((datatype|variable) ~ comma)* ~ (datatype|variable)? ~ right_square_bracket }
-datatype = ${int | big_int | logical | string | date | array_data} 
+datatype = ${int | big_int | logical | string | date  | null | array_data} 
 
-operator = {"+" | "-" | "*" | "/" | "=" | "<" | "<=" | ">" | ">=" | ^"EQ"| ^"NE" | ^"GT" | ^"GE" | ^"LT" | ^"LE" | ^"NOT" | ^"AND" | ^"OR" | "^MATCHES" }
+letter_operator = _{ ( ^"EQ"| ^"NE" | ^"GT" | ^"GE" | ^"LT" | ^"LE" | ^"NOT" | ^"AND" | ^"OR" | "^MATCHES") ~ !(ASCII_ALPHANUMERIC)}
+operator = {"<=" | ">="  | "<>" | "<"  | ">" |"+" | "-" | "*" | "/" | "=" | letter_operator  }
 
-not = { ^"NOT"}
+not_keyword = { ^"NOT"}
 
 subvar = _{ ("_"| "$"| (ASCII_ALPHANUMERIC))+ ~  ("-"| "$"| "_" |"/"|"\\"| (ASCII_ALPHANUMERIC))* }
 
@@ -62,24 +64,28 @@ left_parenthesis = {"("}
 right_parenthesis = {")"}
 
 comma = {","}
+
+function_start = /*$*/ {!(^"WHEN"| aggregate_phrase) ~ (keyword | variable) ~ left_parenthesis }
 //distinguished from regular brackets by a space
-function = ${
-    (keyword | variable) ~ left_parenthesis  ~ (function_content)* ~ right_parenthesis
+function = {
+     function_start ~ (function_content)* ~ right_parenthesis
 }
 
-function_content = { !")" ~ ( WHITESPACE | COMMENT | keyword | expression | comma ) }
+function_content = { !")" ~ ( WHITESPACE | COMMENT |comma | expression | keyword ) }
 
 /* This is more general then the actual language but not verifying syntax 
 exmaple 5 NOT 2 makes no sense in the abl progress language but for formatting purposes is ok */
 expression = {
-    not ~ (function | logical | variable) ~ expression? |
+    not_keyword ~ (function | logical | variable) ~ expression? |
     function ~ (operator ~ expression)? |
     datatype ~ (operator ~ expression )?  |
-    (!^"WHEN" ~ keyword) ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
+    accumulate |
+    (!(^"WHEN"| ^"SUB-TOTAL") ~ keyword) ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
     variable ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
     variable ~( operator ~ expression)?   |
-    left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? 
-
+    left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
+    keyword ~ (operator ~ expression) |
+    (variable|keyword)? ~ properties
 }
 
 conditional_expression_pred = {
@@ -90,13 +96,23 @@ conditional_expression = {
     conditional_expression_pred   ~ expression
 }
 
+by_keyword = { ^"BY"}
+
+by_expression = { by_keyword ~ expression}
+
+accumulate_keyword = ${ ^"ACCUM" ~ ^"U"? ~ ^"L"? ~ ^"A"? ~ ^"T"? ~ ^"E"? }
+
+aggregate_phrase = {  ^"AVERAGE" | ^"COUNT" | ^"MAXIMUM" | ^"MINIMUM" | ^"TOTAL" | ^"SUB-AVERAGE" | ^"SUB-COUNT" | ^"SUB-MAXIMUM" | ^"SUB-MINIMUM" | ^"SUB-TOTAL"}
+
+accumulate = {accumulate_keyword ~ (expression)? ~ aggregate_phrase ~ by_keyword ~ expression }
+
 field_keyword = { ^"FIELD"}
 
 aslike_keyword = { ^"AS" | ^"LIKE" }
 
 like_keyword = {^"LIKE"}
 
-define_keyword = {^"DEFINE"}
+define_keyword = {^"DEFINE"| ^"DEFIN"| ^"DEFI"| ^"DEFI" | ^"DEF"}
 
 temptable_keyword = {^"TEMP-TABLE"}
 
@@ -154,7 +170,7 @@ properties = ${(keyword|variable) ~ properties_sigil ~ (keyword |variable) }
 
 statement = { 
     loop_label | block_end | 
-    (( define_temp_table | assign_statement | function_declaration | properties| conditional_expression | expression | keyword | comma |  datatype  )* 
+    (( define_temp_table | assign_statement | function_declaration | accumulate | properties| by_expression | conditional_expression | expression | keyword | comma |  datatype  )* 
     ~ ( block_begin |  statement_end ))
 }
 

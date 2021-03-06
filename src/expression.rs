@@ -9,6 +9,35 @@ enum BracketFormatting {
     None,
 }
 
+pub fn format_by_expression(by_expression: Pair<Rule>) -> Vec<PrintInfo> {
+    let mut print_list = Vec::new();
+
+    for iner in by_expression.into_inner() {
+        match iner.as_rule() {
+            Rule::by_keyword => print_list.push(PrintInfo::new(
+                format!("{}", &iner.as_span().as_str().to_uppercase()),
+                SpaceType::None,
+            )),
+            Rule::expression => print_list.append(&mut format_expression(iner, false)),
+
+            Rule::WHITESPACE => {
+                if let Some(f) = format_whitespace(iner) {
+                    print_list.push(f);
+                }
+            }
+            Rule::COMMENT => print_list.push(PrintInfo::new(
+                format!("{}", iner.as_span().as_str()),
+                SpaceType::None,
+            )),
+            une => panic!(
+                "{:?},\n{:?} invalid by expression somehow parsed",
+                une, iner
+            ),
+        }
+    }
+    print_list
+}
+
 pub fn format_conditional_expression(conditional_expression: Pair<Rule>) -> Vec<PrintInfo> {
     let mut print_list = Vec::new();
 
@@ -90,7 +119,11 @@ fn inner_format_expression(
         };
         //println!("{:?}", iner);
         match iner.as_rule() {
-            Rule::keyword | Rule::not | Rule::logical | Rule::properties => {
+            Rule::keyword
+            | Rule::not_keyword
+            | Rule::logical
+            | Rule::properties
+            | Rule::temptable_keyword => {
                 print_list.push(PrintInfo::new(
                     format!("{}", &iner.as_span().as_str().to_uppercase()),
                     SpaceType::None,
@@ -129,6 +162,9 @@ fn inner_format_expression(
                     unclosed_left_count,
                 ));
             }
+            Rule::accumulate => {
+                print_list.append(&mut format_accumulate(iner))
+            }
             Rule::WHITESPACE => {
                 if *brackets == BracketFormatting::None {
                     if let Some(f) = format_whitespace(iner) {
@@ -154,6 +190,7 @@ fn inner_format_expression(
                     print_list.push(PrintInfo::new(format!("\n"), SpaceType::NewLine));
                 }
             }
+
             Rule::left_parenthesis => {
                 *unclosed_left_count += 1;
 
@@ -261,12 +298,44 @@ fn format_array(array: Pair<Rule>) -> Vec<PrintInfo> {
     print_list
 }
 
+pub fn format_accumulate(accum:Pair<Rule>) -> Vec<PrintInfo> {
+    let mut print_list = Vec::new();
+    
+    for iner in accum.into_inner(){
+        match iner.as_rule(){
+
+            Rule::accumulate_keyword | Rule::aggregate_phrase |Rule::by_keyword => {
+                print_list.push(PrintInfo::new(
+                    format!("{}", iner.as_span().as_str().to_uppercase()),
+                    SpaceType::None,
+                ));
+            }
+            Rule::expression => {
+                print_list.append(&mut format_expression(iner, false))
+            }
+            Rule::COMMENT => print_list.push(PrintInfo::new(
+                format!("{}", format_comment(iner)),
+                SpaceType::None,
+            )),
+            Rule::WHITESPACE => {
+                if let Some(f) = format_whitespace(iner) {
+                    print_list.push(f);
+                }
+            }
+            _ => panic!("unexpected agregate{:?}", iner.as_rule()),
+            
+        }
+    }
+    print_list
+}
+
 fn format_operator(operator: Pair<Rule>, conditional: bool) -> String {
     match operator.as_span().as_str().trim() {
         "<" => format!("LT"),
         "<=" => format!("LE"),
         ">" => format!("GT"),
         ">=" => format!("GE"),
+        "<>" => format!("NE"),
         "=" if conditional => format!("EQ"),
         misc => format!("{}", misc.to_uppercase()),
     }
