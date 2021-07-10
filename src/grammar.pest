@@ -42,8 +42,8 @@ left_square_bracket = {"["}
 array_data = {variable? ~ left_square_bracket ~ ((datatype|variable) ~ comma)* ~ (datatype|variable)? ~ right_square_bracket }
 datatype = ${int | big_int | logical | string | date  | null | array_data} 
 
-letter_operator = _{ ( ^"EQ"| ^"NE" | ^"GT" | ^"GE" | ^"LT" | ^"LE" | ^"NOT" | ^"AND" | ^"OR" | "^MATCHES") ~ !(ASCII_ALPHANUMERIC)}
-operator = {"<=" | ">="  | "<>" | "<"  | ">" |"+" | "-" | "*" | "/" | "=" | letter_operator  }
+letter_operator = @{ ( ^"EQ"| ^"NE" | ^"GT" | ^"GE" | ^"LT" | ^"LE" | ^"NOT" | ^"AND" | ^"OR" | ^"MATCHES" | ^"AVAILBLE" | ^"AVAILABL" | ^"AVAILAB" | ^"AVAILA" | ^"AVAIL") ~ &WHITESPACE   }
+operator = {"<=" | ">="  | "<>" | "<"  | ">" |"+" | "-" | "*" | "/" | "=" |  letter_operator  }
 
 not_keyword = { ^"NOT"}
 
@@ -73,18 +73,23 @@ function = {
 
 function_content = { !")" ~ ( WHITESPACE | COMMENT |comma | expression | keyword ) }
 
+subexpr = _{
+    operator ~ expression ~ subexpr?
+}
+
 /* This is more general then the actual language but not verifying syntax 
 exmaple 5 NOT 2 makes no sense in the abl progress language but for formatting purposes is ok */
 expression = {
     not_keyword ~ (function | logical | variable) ~ expression? |
-    function ~ (operator ~ expression)? |
-    datatype ~ (operator ~ expression )?  |
+    function ~ (subexpr)? |
+    datatype ~ (subexpr)?  |
     accumulate |
+    properties |
     (!(^"WHEN"| ^"SUB-TOTAL") ~ keyword) ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
     variable ~ left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
-    variable ~( operator ~ expression)?   |
+    variable ~(subexpr)?   |
     left_parenthesis ~ expression ~ right_parenthesis ~ (operator ~ expression)? |
-    keyword ~ (operator ~ expression) |
+    keyword ~ (subexpr) |
     (variable|keyword)? ~ properties
 }
 
@@ -93,7 +98,7 @@ conditional_expression_pred = {
 }
 //expressions starting with if or where will lielly be formatted differentky in future.
 conditional_expression = {
-    conditional_expression_pred   ~ expression
+    conditional_expression_pred  ~ expression
 }
 
 by_keyword = { ^"BY"}
@@ -166,7 +171,7 @@ include = ${ "{" ~ inner_include ~ ("}"| (include ~ inner_include)* ~ "}" )  }
 inner_include = { (!("}"|"{") ~ ANY)*}
 
 properties_sigil = ${":"}
-properties = ${(keyword|variable) ~ properties_sigil ~ (keyword |variable) }
+properties = ${(keyword|variable) ~ properties_sigil ~ (function|keyword |variable  ) }
 
 statement = { 
     loop_label | block_end | 

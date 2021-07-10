@@ -259,6 +259,7 @@ pub fn format_datatype(data_type: Pair<Rule>) -> Vec<PrintInfo> {
                 SpaceType::None,
             )),
             Rule::array_data => print_list.append(&mut format_array(iner)),
+            Rule::string => print_list.push(PrintInfo::new(format!("{}",iner.as_span().as_str()),SpaceType::None)),
             _ => print_list.push(PrintInfo::new(
                 format!("{}", iner.as_span().as_str().to_uppercase()),
                 SpaceType::None,
